@@ -1,0 +1,237 @@
+import axios from 'axios'
+import type { VisitedPlace, TravelStats, Post, PagedPosts, Photo, Video, Profile, GuestbookEntry } from './types'
+import { mockPlaces, mockTravelStats, mockPosts, mockPhotos, mockVideos, mockProfile } from './mock'
+
+/**
+ * API layer with graceful degradation:
+ * every call tries the Spring Cloud gateway first (proxied via /api),
+ * and silently falls back to the local mock dataset when the
+ * backend is offline. The UI never knows the difference.
+ */
+
+const configuredApiBaseUrl = import.meta.env.VITE_API_BASE_URL as string | undefined
+const client = axios.create({ baseURL: configuredApiBaseUrl || '/api', timeout: 4000 })
+
+// attach the owner token (if logged in) to every request
+client.interceptors.request.use((config) => {
+  const token = auth.getToken()
+  if (token) config.headers.Authorization = `Bearer ${token}`
+  return config
+})
+
+/** The backend stores tags as a comma string — normalize to string[]. */
+function normalizePost(raw: Omit<Post, 'tags'> & { tags?: string | string[] }): Post {
+  const tags: string[] = Array.isArray(raw.tags)
+    ? raw.tags
+    : typeof raw.tags === 'string'
+      ? raw.tags.split(',').map((t) => t.trim()).filter(Boolean)
+      : []
+  return { ...raw, tags }
+}
+
+// Firebase Hosting rewrites unknown paths (including /api/*) to index.html.
+// Without an explicit production API URL, treat the backend as offline from
+// the start so the app uses its built-in dataset instead of accepting HTML as
+// a successful JSON response and crashing on malformed shapes.
+let backendAlive: boolean | null =
+  import.meta.env.PROD && !configuredApiBaseUrl ? false : null
+
+async function withFallback<T>(request: () => Promise<T>, fallback: T): Promise<T> {
+  if (backendAlive === false) return fallback
+  try {
+    const result = await request()
+    backendAlive = true
+    return result
+  } catch {
+    backendAlive = false
+    // re-probe on the next page load, not every call
+    setTimeout(() => (backendAlive = null), 30_000)
+    return fallback
+  }
+}
+
+export const api = {
+  isBackendAlive: () => backendAlive,
+
+  async getPlaces(): Promise<VisitedPlace[]> {
+    return withFallback(async () => (await client.get('/travel/locations')).data, mockPlaces)
+  },
+
+  async getTravelStats(): Promise<TravelStats> {
+    return withFallback(async () => (await client.get('/travel/stats')).data, mockTravelStats)
+  },
+
+  async getPosts(params?: { tag?: string; q?: string; page?: number; size?: number }): Promise<PagedPosts> {
+    const fallback: PagedPosts = {
+      content: filterMockPosts(params),
+      totalElements: mockPosts.length,
+      totalPages: 1,
+      page: 0,
+    }
+    return withFallback(async () => {
+      const data = (await client.get('/posts', { params })).data
+      return { ...data, content: (data.content ?? []).map(normalizePost) }
+    }, fallback)
+  },
+
+  async getPost(slug: string): Promise<Post | undefined> {
+    return withFallback(
+      async () => normalizePost((await client.get(`/posts/${slug}`)).data),
+      mockPosts.find((p) => p.slug === slug),
+    )
+  },
+
+  async getPhotos(category?: string): Promise<Photo[]> {
+    const fallback = category && category !== 'all' ? mockPhotos.filter((p) => p.category === category) : mockPhotos
+    return withFallback(
+      async () => (await client.get('/media/photos', { params: category && category !== 'all' ? { category } : {} })).data,
+      fallback,
+    )
+  },
+
+  async getVideos(): Promise<Video[]> {
+    return withFallback(async () => (await client.get('/media/videos')).data, mockVideos)
+  },
+
+  async getProfile(): Promise<Profile> {
+    return withFallback(async () => (await client.get('/profile')).data, mockProfile)
+  },
+}
+
+function filterMockPosts(params?: { tag?: string; q?: string }): Post[] {
+  let posts = [...mockPosts].sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+  if (params?.tag) posts = posts.filter((p) => p.tags.includes(params.tag!))
+  if (params?.q) {
+    const q = params.q.toLowerCase()
+    posts = posts.filter((p) => p.title.toLowerCase().includes(q) || p.excerpt.toLowerCase().includes(q))
+  }
+  return posts
+}
+
+/* ---------- owner auth (JWT via auth-service) ---------- */
+
+const AUTH_KEY = 'manhnpc.auth'
+
+export interface OwnerSession {
+  token: string
+  user: { id: number; username: string; displayName: string; avatarUrl?: string }
+}
+
+export const auth = {
+  getSession(): OwnerSession | null {
+    try {
+      const raw = localStorage.getItem(AUTH_KEY)
+      return raw ? JSON.parse(raw) : null
+    } catch {
+      return null
+    }
+  },
+  getToken(): string | null {
+    return auth.getSession()?.token ?? null
+  },
+  isOwner(): boolean {
+    return !!auth.getToken()
+  },
+  async login(username: string, password: string): Promise<OwnerSession> {
+    // deliberate direct call, no fallback — login is meaningless offline
+    const { data } = await client.post('/auth/login', { username, password })
+    const session: OwnerSession = { token: data.token, user: data.user }
+    localStorage.setItem(AUTH_KEY, JSON.stringify(session))
+    return session
+  },
+  logout() {
+    localStorage.removeItem(AUTH_KEY)
+  },
+}
+
+/* ---------- guestbook: backend when available, localStorage otherwise ---------- */
+
+const GUESTBOOK_KEY = 'manhnpc.guestbook'
+
+const seedGuestbook: GuestbookEntry[] = [
+  { id: 'seed-1', name: 'linh.dev', message: 'That globe is unreasonably smooth. Teach me your shader ways 🙏', emoji: '🚀', createdAt: '2026-07-20T14:12:00' },
+  { id: 'seed-2', name: 'tuan_backend', message: 'Six microservices for a personal site... respect. Absolutely unhinged. Respect.', emoji: '🔥', createdAt: '2026-07-22T09:41:00', },
+  { id: 'seed-3', name: 'a stranger from HN', message: 'Got lost spinning the Earth for ten minutes. This is what the web should feel like.', emoji: '🌏', createdAt: '2026-07-25T23:05:00' },
+]
+
+function localList(): GuestbookEntry[] {
+  try {
+    const raw = localStorage.getItem(GUESTBOOK_KEY)
+    const own: GuestbookEntry[] = raw ? JSON.parse(raw) : []
+    return [...own, ...seedGuestbook].sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+  } catch {
+    return seedGuestbook
+  }
+}
+
+function localAdd(name: string, message: string, emoji: string): GuestbookEntry {
+  const entry: GuestbookEntry = {
+    id: `gb-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    name: name.trim() || 'anonymous traveler',
+    message: message.trim(),
+    emoji,
+    createdAt: new Date().toISOString(),
+  }
+  try {
+    const raw = localStorage.getItem(GUESTBOOK_KEY)
+    const own: GuestbookEntry[] = raw ? JSON.parse(raw) : []
+    localStorage.setItem(GUESTBOOK_KEY, JSON.stringify([entry, ...own].slice(0, 200)))
+  } catch {
+    /* storage unavailable — entry still shows for this session via state */
+  }
+  return entry
+}
+
+export const guestbook = {
+  async list(): Promise<GuestbookEntry[]> {
+    return withFallback(async () => {
+      const { data } = await client.get('/guestbook')
+      return data.map((e: GuestbookEntry & { id: number }) => ({ ...e, id: String(e.id) }))
+    }, localList())
+  },
+  async add(name: string, message: string, emoji: string): Promise<GuestbookEntry> {
+    // not withFallback: localAdd has a side effect, so only run it on real failure
+    try {
+      const { data } = await client.post('/guestbook', { name, message, emoji })
+      backendAlive = true
+      return { ...data, id: String(data.id) }
+    } catch {
+      return localAdd(name, message, emoji)
+    }
+  },
+  /** Owner only — real backend entries have numeric ids. */
+  async remove(id: string): Promise<boolean> {
+    if (!/^\d+$/.test(id)) return false
+    try {
+      await client.delete(`/guestbook/${id}`)
+      return true
+    } catch {
+      return false
+    }
+  },
+}
+
+/* ---------- likes: localStorage per-visitor ---------- */
+
+const LIKES_KEY = 'manhnpc.likes'
+
+export const likes = {
+  all(): Record<string, boolean> {
+    try {
+      return JSON.parse(localStorage.getItem(LIKES_KEY) ?? '{}')
+    } catch {
+      return {}
+    }
+  },
+  toggle(key: string): boolean {
+    const state = likes.all()
+    state[key] = !state[key]
+    try {
+      localStorage.setItem(LIKES_KEY, JSON.stringify(state))
+    } catch { /* ignore */ }
+    return state[key]
+  },
+  has(key: string): boolean {
+    return !!likes.all()[key]
+  },
+}
