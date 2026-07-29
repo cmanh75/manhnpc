@@ -1,291 +1,238 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { motion, useScroll, useTransform } from 'framer-motion'
-import { ArrowRight, Globe2, Image as ImageIcon, FileText, MapPin, Sparkles } from 'lucide-react'
-import { GlobeScene } from '../components/globe/GlobeScene'
-import { PlaceCard } from '../components/globe/PlaceCard'
-import { PageShell, Reveal, CountUp, BackendBadge } from '../components/ui'
-import { TiltCard, Magnetic } from '../components/ui/Effects'
-import { api } from '../lib/api'
-import type { VisitedPlace, Post, Photo, Profile } from '../lib/types'
-import { mockPlaces, mockProfile } from '../lib/mock'
-import { formatDate } from '../lib/utils'
+import { motion } from 'framer-motion'
+import {
+  ArrowUpRight,
+  BriefcaseBusiness,
+  Code2,
+  GraduationCap,
+  Mail,
+  MapPin,
+  Phone,
+  Trophy,
+} from 'lucide-react'
+import { GithubIcon, LinkedinIcon } from '../components/ui/BrandIcons'
+import { Reveal } from '../components/ui'
 
-const typedPhrases = ['software engineer.', 'world wanderer.', 'pixel perfectionist.', 'phở enthusiast.', 'system architect.']
+const experience = {
+  period: '07/2025 — Hiện tại',
+  company: 'Viettel Software',
+  role: 'Junior Software Engineer',
+  description:
+    'Phát triển backend cho phần mềm doanh nghiệp: xây dựng và bảo trì REST API, thiết kế cơ sở dữ liệu và phối hợp trong đội ngũ Agile.',
+  technologies: ['Java', 'Spring Boot', 'SQL', 'Git'],
+}
 
-function Typewriter() {
-  const [text, setText] = useState('')
-  const [phrase, setPhrase] = useState(0)
-  const [deleting, setDeleting] = useState(false)
+const projects = [
+  {
+    period: '02/2026 — 06/2026',
+    name: 'English Learning Supporter',
+    role: 'Full-stack Developer',
+    description:
+      'Nền tảng hỗ trợ học tiếng Anh tích hợp LLM, giao tiếp thời gian thực và các dịch vụ backend độc lập.',
+    technologies: ['Spring Boot', 'ReactJS', 'FastAPI', 'MariaDB', 'WebSocket', 'Docker', 'OpenAI', 'Gemini'],
+    links: [
+      { label: 'Backend', href: 'https://github.com/cmanh75/english-supporter-backend' },
+      { label: 'Frontend', href: 'https://github.com/cmanh75/english-supporter-frontend' },
+    ],
+  },
+  {
+    period: '09/2025 — 12/2025',
+    name: 'Yoga Detection',
+    role: 'Backend Developer',
+    description:
+      'Ứng dụng nhận diện tư thế yoga, kết hợp backend thời gian thực với ứng dụng Flutter và Google ML Kit.',
+    technologies: ['Spring Boot', 'PostgreSQL', 'Socket.IO', 'Firebase', 'Cloudinary', 'Flutter', 'Google ML Kit'],
+    links: [{ label: 'GitHub', href: 'https://github.com/spad0604/Yoga_detection' }],
+  },
+  {
+    period: '04/2025 — 07/2025',
+    name: 'VGOV',
+    role: 'Self-taught Developer',
+    description: 'Ứng dụng web full-stack được xây dựng độc lập với REST API và cơ sở dữ liệu quan hệ.',
+    technologies: ['Spring Boot', 'ReactJS', 'MariaDB'],
+    links: [{ label: 'GitHub', href: 'https://github.com/cmanh75/vgov' }],
+  },
+]
 
-  useEffect(() => {
-    const current = typedPhrases[phrase]
-    const timeout = setTimeout(
-      () => {
-        if (!deleting) {
-          const next = current.slice(0, text.length + 1)
-          setText(next)
-          if (next === current) setTimeout(() => setDeleting(true), 1600)
-        } else {
-          const next = current.slice(0, text.length - 1)
-          setText(next)
-          if (next === '') {
-            setDeleting(false)
-            setPhrase((p) => (p + 1) % typedPhrases.length)
-          }
-        }
-      },
-      deleting ? 34 : 74,
-    )
-    return () => clearTimeout(timeout)
-  }, [text, deleting, phrase])
+const awards = [
+  ['2025', 'Giải Nhất Code Challenge 2025 — Viettel Software'],
+  ['2025', 'Giải Khuyến khích Viettel Programming Challenge 2025'],
+  ['2022', 'Giải Khuyến khích Olympic Tin học Việt Nam (VOI)'],
+  ['2022', 'Huy chương Đồng kỳ thi học sinh giỏi các trường THPT chuyên khu vực Duyên hải & Đồng bằng Bắc Bộ'],
+]
 
+const skillGroups = [
+  { name: 'Backend', items: ['Java', 'Spring Boot', 'Python', 'FastAPI', 'REST API', 'WebSocket'] },
+  { name: 'Frontend', items: ['ReactJS', 'JavaScript', 'HTML', 'CSS'] },
+  { name: 'Data & Tools', items: ['PostgreSQL', 'MariaDB', 'Docker', 'Git'] },
+  { name: 'Foundations', items: ['C', 'C++', 'Competitive Programming'] },
+]
+
+function SectionTitle({ eyebrow, title }: { eyebrow: string; title: string }) {
   return (
-    <span className="font-mono text-cyan">
-      {text}
-      <span className="animate-blink">▌</span>
-    </span>
+    <div className="mb-8">
+      <p className="font-mono text-xs uppercase tracking-[0.2em] text-cyan">{eyebrow}</p>
+      <h2 className="mt-2 font-display text-3xl font-bold tracking-tight md:text-4xl">{title}</h2>
+    </div>
   )
 }
 
 export function HomePage() {
-  const [places, setPlaces] = useState<VisitedPlace[]>(mockPlaces)
-  const [posts, setPosts] = useState<Post[]>([])
-  const [photos, setPhotos] = useState<Photo[]>([])
-  const [profile, setProfile] = useState<Profile>(mockProfile)
-
-  useEffect(() => {
-    api.getPlaces().then(setPlaces)
-    api.getPosts({ size: 3 }).then((p) => setPosts(p.content.slice(0, 3)))
-    api.getPhotos().then((p) => setPhotos(p.filter((x) => x.featured).slice(0, 4)))
-    api.getProfile().then(setProfile)
-  }, [])
-
-  const marqueeSkills = useMemo(() => [...profile.skills, ...profile.skills], [profile.skills])
-
-  // scroll-linked parallax: the globe recedes and dims as you scroll past the hero
-  const heroRef = useRef<HTMLElement>(null)
-  const { scrollYProgress } = useScroll({ target: heroRef, offset: ['start start', 'end start'] })
-  const globeY = useTransform(scrollYProgress, [0, 1], ['0%', '28%'])
-  const globeScale = useTransform(scrollYProgress, [0, 1], [1, 0.86])
-  const heroOpacity = useTransform(scrollYProgress, [0, 0.85], [1, 0])
-  const textY = useTransform(scrollYProgress, [0, 1], ['0%', '-18%'])
-
   return (
-    <>
-      {/* ============ HERO ============ */}
-      <section ref={heroRef} className="relative flex min-h-svh flex-col justify-center overflow-hidden">
-        {/* globe canvas fills the hero, shifted right on desktop */}
-        <motion.div style={{ y: globeY, scale: globeScale, opacity: heroOpacity }} className="absolute inset-0 md:left-1/4">
-          <GlobeScene places={places} ambient className="size-full" />
-        </motion.div>
-        {/* readability gradient over the left column */}
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-void via-void/70 to-transparent md:via-void/40" />
-
-        <motion.div style={{ y: textY }} className="pointer-events-none relative z-10 mx-auto w-full max-w-7xl px-6 md:px-10">
-          <div className="max-w-xl">
-            <motion.div
-              initial={{ opacity: 0, y: 24 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.7, delay: 0.15 }}
-              className="pointer-events-auto"
-            >
-              <div className="mb-5 flex items-center gap-3">
-                <span className="inline-flex items-center gap-2 rounded-full bg-cyan/10 px-3 py-1 font-mono text-xs text-cyan ring-1 ring-cyan/30">
-                  <Sparkles size={11} />
-                  personal universe · est. 2026
-                </span>
-                <BackendBadge />
-              </div>
-
-              <h1 className="font-display text-5xl font-bold leading-[1.05] tracking-tight md:text-7xl">
-                Hi, I'm <span className="text-gradient">Khánh</span>
-                <span className="text-cyan">.</span>
-              </h1>
-
-              <p className="mt-4 text-lg text-muted md:text-xl">
-                <Typewriter />
-              </p>
-
-              <p className="mt-5 max-w-md leading-relaxed text-ink/70">
-                {profile.bio}
-              </p>
-
-              <div className="mt-8 flex flex-wrap items-center gap-4">
-                <Magnetic>
-                  <Link
-                    to="/globe"
-                    className="group inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-cyan to-violet px-5 py-3 font-mono text-sm font-semibold text-void transition hover:shadow-[0_0_32px_-6px_#22d3ee]"
-                  >
-                    <Globe2 size={16} />
-                    explore my planet
-                    <ArrowRight size={15} className="transition group-hover:translate-x-1" />
-                  </Link>
-                </Magnetic>
-                <Magnetic>
-                  <Link
-                    to="/about"
-                    className="glass inline-flex items-center gap-2 rounded-xl px-5 py-3 font-mono text-sm text-ink transition hover:ring-1 hover:ring-cyan/40"
-                  >
-                    whoami
-                  </Link>
-                </Magnetic>
-              </div>
-
-              <div className="mt-10 flex items-center gap-8 font-mono text-sm">
-                <div>
-                  <div className="text-2xl font-bold text-ink"><CountUp to={profile.stats.countriesVisited} /></div>
-                  <div className="text-xs text-faint">countries</div>
-                </div>
-                <div className="h-8 w-px bg-white/10" />
-                <div>
-                  <div className="text-2xl font-bold text-ink"><CountUp to={places.length} /></div>
-                  <div className="text-xs text-faint">pins on the globe</div>
-                </div>
-                <div className="h-8 w-px bg-white/10" />
-                <div>
-                  <div className="text-2xl font-bold text-ink"><CountUp to={profile.stats.yearsOfExperience} suffix="+" /></div>
-                  <div className="text-xs text-faint">years shipping</div>
-                </div>
-              </div>
-            </motion.div>
-          </div>
-        </motion.div>
-
-        <PlaceCard />
-
-        {/* scroll hint */}
+    <main className="relative z-10">
+      <section id="about" className="mx-auto flex min-h-svh max-w-6xl items-center px-6 pb-20 pt-32 md:px-10">
         <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 1.6 }}
-          className="pointer-events-none absolute bottom-8 left-1/2 z-10 -translate-x-1/2 font-mono text-[11px] text-faint"
+          initial={{ opacity: 0, y: 24 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.7 }}
         >
-          <motion.div animate={{ y: [0, 7, 0] }} transition={{ repeat: Infinity, duration: 1.8 }}>
-            ▼ scroll to explore
-          </motion.div>
+          <p className="mb-4 font-mono text-sm text-cyan">Xin chào, mình là</p>
+          <h1 className="font-display text-5xl font-bold leading-[1.03] tracking-tight md:text-7xl">
+            Nguyễn Phi
+            <br />
+            <span className="text-gradient">Cường Mạnh</span>
+          </h1>
+          <p className="mt-5 text-xl font-medium text-ink/80">Junior Software Engineer</p>
+          <p className="mt-5 max-w-3xl text-base leading-7 text-muted">
+            Kỹ sư phần mềm định hướng backend, có kinh nghiệm xây dựng REST API, thiết kế cơ sở dữ liệu
+            và phát triển ứng dụng full-stack. Mình tập trung vào Java Spring Boot, kiến trúc rõ ràng
+            và những sản phẩm giải quyết bài toán thực tế.
+          </p>
+
+          <div className="mt-8 flex flex-wrap gap-3">
+            <a href="#projects" className="inline-flex items-center gap-2 rounded-xl bg-cyan px-5 py-3 font-mono text-sm font-semibold text-void transition hover:shadow-[0_0_28px_-5px_#22d3ee]">
+              Xem dự án <ArrowUpRight size={16} />
+            </a>
+            <a href="mailto:npcm752004t2k29@gmail.com" className="glass inline-flex items-center gap-2 rounded-xl px-5 py-3 font-mono text-sm text-ink transition hover:border-cyan/40">
+              <Mail size={16} /> Liên hệ
+            </a>
+          </div>
+
+          <div className="mt-8 flex flex-wrap gap-x-6 gap-y-3 text-sm text-muted">
+            <span className="inline-flex items-center gap-2"><MapPin size={15} className="text-violet" /> Hai Bà Trưng, Hà Nội</span>
+            <a className="inline-flex items-center gap-2 transition hover:text-cyan" href="tel:+84973772148"><Phone size={15} className="text-violet" /> 0973 772 148</a>
+          </div>
         </motion.div>
+
       </section>
 
-      {/* ============ SKILLS MARQUEE ============ */}
-      <section className="relative z-10 border-y border-white/5 bg-space/60 py-5 backdrop-blur">
-        <div className="overflow-hidden" style={{ maskImage: 'linear-gradient(90deg, transparent, black 12%, black 88%, transparent)' }}>
-          <div className="flex w-max animate-marquee gap-3">
-            {marqueeSkills.map((skill, i) => (
-              <span key={i} className="glass rounded-lg px-4 py-1.5 font-mono text-[13px] text-muted">
-                <span className="mr-1.5 text-cyan">◆</span>
-                {skill}
-              </span>
-            ))}
-          </div>
-        </div>
-      </section>
+      <div className="mx-auto max-w-6xl space-y-28 px-6 pb-16 md:px-10">
+        <section id="experience">
+          <Reveal>
+            <SectionTitle eyebrow="Kinh nghiệm" title="Kinh nghiệm làm việc" />
+            <article className="glass grid gap-6 rounded-2xl p-6 md:grid-cols-[180px_1fr] md:p-8">
+              <p className="font-mono text-sm text-cyan">{experience.period}</p>
+              <div>
+                <div className="flex items-start gap-3">
+                  <BriefcaseBusiness className="mt-1 shrink-0 text-violet" size={20} />
+                  <div>
+                    <h3 className="font-display text-xl font-bold">{experience.role}</h3>
+                    <p className="mt-1 text-ink/70">{experience.company}</p>
+                  </div>
+                </div>
+                <p className="mt-4 max-w-3xl leading-7 text-muted">{experience.description}</p>
+                <div className="mt-5 flex flex-wrap gap-2">
+                  {experience.technologies.map((item) => <span key={item} className="rounded-lg bg-cyan/10 px-3 py-1 font-mono text-xs text-cyan">{item}</span>)}
+                </div>
+              </div>
+            </article>
+          </Reveal>
+        </section>
 
-      <PageShell wide className="pt-24">
-        {/* ============ FEATURED SHOTS ============ */}
-        <Reveal>
-          <div className="mb-8 flex items-end justify-between">
-            <div>
-              <div className="mb-2 font-mono text-[13px] text-cyan"><span className="text-faint">$</span> ls ./memories --featured</div>
-              <h2 className="font-display text-3xl font-bold tracking-tight md:text-4xl">Latest captures</h2>
-            </div>
-            <Link to="/gallery" className="group hidden items-center gap-1.5 font-mono text-sm text-muted transition hover:text-cyan md:flex">
-              view all <ArrowRight size={14} className="transition group-hover:translate-x-1" />
-            </Link>
-          </div>
-        </Reveal>
-
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-          {photos.map((photo, i) => (
-            <Reveal key={photo.id} delay={i * 0.08}>
-              <TiltCard className="rounded-2xl">
-                <Link
-                  to="/gallery"
-                  className="border-beam group relative block overflow-hidden rounded-2xl bg-panel"
-                  style={{ aspectRatio: i % 3 === 1 ? '3/4' : '4/5' }}
-                >
-                  <img
-                    src={photo.thumbnailUrl}
-                    alt={photo.title}
-                    loading="lazy"
-                    className="absolute inset-0 size-full object-cover transition duration-700 group-hover:scale-105"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-80" />
-                  <div className="absolute inset-x-0 bottom-0 p-4">
-                    <div className="font-display text-sm font-semibold">{photo.title}</div>
-                    <div className="mt-0.5 flex items-center gap-1 font-mono text-[11px] text-muted">
-                      <MapPin size={10} /> {photo.location}
+        <section id="projects">
+          <Reveal><SectionTitle eyebrow="Dự án" title="Dự án nổi bật" /></Reveal>
+          <div className="grid gap-5">
+            {projects.map((project, index) => (
+              <Reveal key={project.name} delay={index * 0.08}>
+                <article className="glass rounded-2xl p-6 transition hover:border-white/20 md:p-8">
+                  <div className="grid gap-5 md:grid-cols-[180px_1fr]">
+                    <p className="font-mono text-sm text-cyan">{project.period}</p>
+                    <div>
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <h3 className="font-display text-xl font-bold">{project.name}</h3>
+                          <p className="mt-1 text-sm text-violet">{project.role}</p>
+                        </div>
+                        <div className="flex gap-2">
+                          {project.links.map((link) => (
+                            <a key={link.href} href={link.href} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-mono text-xs text-muted transition hover:text-cyan">
+                              {link.label} <ArrowUpRight size={13} />
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                      <p className="mt-4 max-w-3xl leading-7 text-muted">{project.description}</p>
+                      <div className="mt-5 flex flex-wrap gap-2">
+                        {project.technologies.map((item) => <span key={item} className="rounded-lg bg-white/5 px-3 py-1 font-mono text-xs text-ink/70">{item}</span>)}
+                      </div>
                     </div>
                   </div>
-                </Link>
-              </TiltCard>
-            </Reveal>
-          ))}
-        </div>
+                </article>
+              </Reveal>
+            ))}
+          </div>
+        </section>
 
-        {/* ============ LATEST WRITING ============ */}
-        <Reveal className="mt-24">
-          <div className="mb-8 flex items-end justify-between">
-            <div>
-              <div className="mb-2 font-mono text-[13px] text-cyan"><span className="text-faint">$</span> tail -n 3 ./blog</div>
-              <h2 className="font-display text-3xl font-bold tracking-tight md:text-4xl">Recent writing</h2>
+        <section id="skills">
+          <Reveal><SectionTitle eyebrow="Năng lực" title="Kỹ năng chuyên môn" /></Reveal>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {skillGroups.map((group, index) => (
+              <Reveal key={group.name} delay={index * 0.06}>
+                <div className="glass h-full rounded-2xl p-6">
+                  <div className="mb-4 flex items-center gap-2"><Code2 size={17} className="text-cyan" /><h3 className="font-display font-semibold">{group.name}</h3></div>
+                  <div className="flex flex-wrap gap-2">
+                    {group.items.map((item) => <span key={item} className="rounded-lg bg-white/5 px-3 py-1.5 text-sm text-muted">{item}</span>)}
+                  </div>
+                </div>
+              </Reveal>
+            ))}
+          </div>
+        </section>
+
+        <section id="education" className="grid gap-12 md:grid-cols-2">
+          <Reveal>
+            <SectionTitle eyebrow="Học vấn" title="Đào tạo" />
+            <div className="glass rounded-2xl p-6">
+              <GraduationCap className="mb-4 text-cyan" />
+              <h3 className="font-display text-lg font-bold">Đại học Bách khoa Hà Nội</h3>
+              <p className="mt-1 text-violet">Khoa học máy tính · 09/2022 — Hiện tại</p>
+              <p className="mt-4 text-sm leading-6 text-muted">GPA 3.25/4.00 · CPA 3.27/4.00 (2026.1)</p>
+              <div className="my-5 h-px bg-white/10" />
+              <h3 className="font-display font-semibold">THPT Chuyên Hà Tĩnh</h3>
+              <p className="mt-1 text-sm text-muted">Chuyên Toán · 09/2019 — 09/2022</p>
             </div>
-            <Link to="/blog" className="group hidden items-center gap-1.5 font-mono text-sm text-muted transition hover:text-cyan md:flex">
-              all posts <ArrowRight size={14} className="transition group-hover:translate-x-1" />
-            </Link>
-          </div>
-        </Reveal>
+          </Reveal>
 
-        <div className="grid gap-5 md:grid-cols-3">
-          {posts.map((post, i) => (
-            <Reveal key={post.id} delay={i * 0.1}>
-              <TiltCard className="h-full rounded-2xl" maxTilt={4}>
-              <Link to={`/blog/${post.slug}`} className="border-beam glass group flex h-full flex-col rounded-2xl p-6 transition hover:bg-white/[0.06]">
-                <div className="mb-4 flex items-center gap-2 font-mono text-[11px] text-faint">
-                  <FileText size={11} className="text-violet" />
-                  {formatDate(post.createdAt)} · {post.readingTime} min
-                </div>
-                <h3 className="font-display text-lg font-semibold leading-snug tracking-tight transition group-hover:text-cyan">
-                  {post.title}
-                </h3>
-                <p className="mt-2 line-clamp-3 flex-1 text-sm leading-relaxed text-muted">{post.excerpt}</p>
-                <div className="mt-4 flex flex-wrap gap-1.5">
-                  {post.tags.slice(0, 3).map((tag) => (
-                    <span key={tag} className="rounded-md bg-violet/10 px-2 py-0.5 font-mono text-[10px] text-violet">
-                      #{tag}
-                    </span>
-                  ))}
-                </div>
-              </Link>
-              </TiltCard>
-            </Reveal>
-          ))}
-        </div>
+          <Reveal delay={0.08}>
+            <SectionTitle eyebrow="Thành tích" title="Giải thưởng" />
+            <div className="glass rounded-2xl p-6">
+              <Trophy className="mb-4 text-amber" />
+              <div className="space-y-4">
+                {awards.map(([year, award]) => (
+                  <div key={award} className="grid grid-cols-[48px_1fr] gap-3 text-sm">
+                    <span className="font-mono text-amber">{year}</span>
+                    <span className="leading-6 text-muted">{award}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </Reveal>
+        </section>
 
-        {/* ============ CTA ============ */}
-        <Reveal className="mt-24">
-          <div className="border-beam glass relative overflow-hidden rounded-3xl p-10 text-center md:p-16">
-            <div
-              className="pointer-events-none absolute -top-24 left-1/2 size-96 -translate-x-1/2 rounded-full opacity-25 blur-[100px]"
-              style={{ background: 'radial-gradient(circle, #a78bfa, transparent 70%)' }}
-            />
-            <ImageIcon className="mx-auto mb-4 text-violet" size={28} />
-            <h2 className="font-display text-3xl font-bold tracking-tight md:text-4xl">
-              This is my corner of the internet<span className="text-cyan">.</span>
-            </h2>
-            <p className="mx-auto mt-3 max-w-xl text-muted">
-              No algorithm, no ads, no feed — just a planet of memories, a shelf of photos and some late-night writing.
-              Leave a note in the guestbook so I know you passed by.
-            </p>
-            <Link
-              to="/guestbook"
-              className="mt-7 inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-violet to-pink px-6 py-3 font-mono text-sm font-semibold text-void transition hover:shadow-[0_0_32px_-6px_#a78bfa]"
-            >
-              sign the guestbook <ArrowRight size={15} />
-            </Link>
-          </div>
-        </Reveal>
-      </PageShell>
-    </>
+        <section id="contact">
+          <Reveal>
+            <div className="border-beam glass rounded-3xl p-8 text-center md:p-12">
+              <p className="font-mono text-xs uppercase tracking-[0.2em] text-cyan">Liên hệ</p>
+              <h2 className="mt-3 font-display text-3xl font-bold md:text-4xl">Cùng xây dựng một sản phẩm tốt.</h2>
+              <p className="mx-auto mt-4 max-w-xl leading-7 text-muted">Mình luôn sẵn sàng trao đổi về cơ hội phát triển phần mềm và những dự án thú vị.</p>
+              <div className="mt-7 flex flex-wrap justify-center gap-3">
+                <a href="mailto:npcm752004t2k29@gmail.com" className="inline-flex items-center gap-2 rounded-xl bg-cyan px-5 py-3 font-mono text-sm font-semibold text-void"><Mail size={16} /> Email</a>
+                <a href="https://github.com/cmanh75" target="_blank" rel="noreferrer" className="glass inline-flex items-center gap-2 rounded-xl px-5 py-3 font-mono text-sm"><GithubIcon size={16} /> GitHub</a>
+                <a href="https://www.linkedin.com/in/cmanh75/" target="_blank" rel="noreferrer" className="glass inline-flex items-center gap-2 rounded-xl px-5 py-3 font-mono text-sm"><LinkedinIcon size={16} /> LinkedIn</a>
+              </div>
+            </div>
+          </Reveal>
+        </section>
+      </div>
+    </main>
   )
 }

@@ -1,25 +1,19 @@
 import { useEffect, useState } from 'react'
-import { Link, NavLink, useLocation } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Command, Terminal } from 'lucide-react'
+import { Menu, Terminal, X } from 'lucide-react'
 import { clsx } from '../../lib/utils'
-import { useAppStore } from '../../store/useAppStore'
 
 const links = [
-  { to: '/', label: 'home', end: true },
-  { to: '/globe', label: 'globe' },
-  { to: '/gallery', label: 'gallery' },
-  { to: '/videos', label: 'videos' },
-  { to: '/blog', label: 'blog' },
-  { to: '/guestbook', label: 'guestbook' },
-  { to: '/about', label: 'about' },
+  { to: '#about', label: 'Giới thiệu' },
+  { to: '#experience', label: 'Kinh nghiệm' },
+  { to: '#projects', label: 'Dự án' },
+  { to: '#skills', label: 'Kỹ năng' },
+  { to: '#contact', label: 'Liên hệ' },
 ]
 
 export function Navbar() {
   const [scrolled, setScrolled] = useState(false)
-  const setPaletteOpen = useAppStore((s) => s.setPaletteOpen)
-  const owner = useAppStore((s) => s.owner)
-  const location = useLocation()
+  const [open, setOpen] = useState(false)
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 24)
@@ -32,71 +26,28 @@ export function Navbar() {
     <motion.header
       initial={{ y: -80, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
-      transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1], delay: 0.1 }}
+      transition={{ duration: 0.7 }}
       className="fixed inset-x-0 top-0 z-50 flex justify-center px-4 pt-4"
     >
-      <nav
-        className={clsx(
-          'flex w-full max-w-5xl items-center justify-between gap-4 rounded-2xl px-4 py-2.5 transition-all duration-500 md:px-6',
-          scrolled ? 'glass-strong shadow-2xl shadow-black/40' : 'border border-transparent',
-        )}
-      >
-        <Link to="/" className="group flex items-center gap-2.5">
-          <span className="grid size-8 place-items-center rounded-lg bg-gradient-to-br from-cyan/20 to-violet/20 ring-1 ring-white/15 transition group-hover:ring-cyan/50">
-            <Terminal size={15} className="text-cyan" />
-          </span>
-          <span className="font-mono text-sm font-semibold tracking-tight">
-            manhnpc<span className="text-cyan animate-blink">_</span>
-          </span>
-        </Link>
+      <nav className={clsx('relative flex w-full max-w-6xl items-center justify-between rounded-2xl px-4 py-2.5 transition-all md:px-6', scrolled || open ? 'glass-strong shadow-2xl shadow-black/40' : 'border border-transparent')}>
+        <a href="#about" className="flex items-center gap-2.5">
+          <span className="grid size-8 place-items-center rounded-lg bg-gradient-to-br from-cyan/20 to-violet/20 ring-1 ring-white/15"><Terminal size={15} className="text-cyan" /></span>
+          <span className="font-mono text-sm font-semibold">cmanh75<span className="animate-blink text-cyan">_</span></span>
+        </a>
 
-        <ul className="hidden items-center gap-1 md:flex">
-          {links.map((link) => (
-            <li key={link.to} className="relative">
-              <NavLink
-                to={link.to}
-                end={link.end}
-                className={({ isActive }) =>
-                  clsx(
-                    'relative block rounded-lg px-3 py-1.5 font-mono text-[13px] transition',
-                    isActive ? 'text-cyan' : 'text-muted hover:text-ink',
-                  )
-                }
-              >
-                {link.label}
-              </NavLink>
-              {(location.pathname === link.to || (!link.end && link.to !== '/' && location.pathname.startsWith(link.to))) && (
-                <motion.span
-                  layoutId="nav-glow"
-                  className="absolute inset-0 -z-10 rounded-lg bg-cyan/10 ring-1 ring-cyan/25"
-                  transition={{ type: 'spring', stiffness: 380, damping: 32 }}
-                />
-              )}
-            </li>
-          ))}
-        </ul>
-
-        <div className="flex items-center gap-2">
-          {owner && (
-            <Link
-              to="/login"
-              className="hidden items-center gap-1.5 rounded-lg bg-mint/10 px-2.5 py-1.5 font-mono text-[11px] text-mint ring-1 ring-mint/30 transition hover:ring-mint/60 sm:flex"
-              title="Owner mode — click to manage session"
-            >
-              <span className="size-1.5 rounded-full bg-mint shadow-[0_0_6px_#34d399]" />
-              owner
-            </Link>
-          )}
-          <button
-            onClick={() => setPaletteOpen(true)}
-            className="glass flex items-center gap-2 rounded-lg px-3 py-1.5 font-mono text-xs text-muted transition hover:text-ink hover:ring-1 hover:ring-cyan/40"
-            aria-label="Open command palette"
-          >
-            <Command size={12} />
-            <span className="hidden sm:inline">cmd</span>
-            <kbd className="rounded bg-white/10 px-1.5 py-0.5 text-[10px]">⌘K</kbd>
-          </button>
+        <div className="hidden items-center gap-1 md:flex">
+          {links.map((link) => <a key={link.to} href={link.to} className="rounded-lg px-3 py-1.5 font-mono text-xs text-muted transition hover:bg-white/5 hover:text-cyan">{link.label}</a>)}
         </div>
+
+        <button type="button" aria-label="Mở menu" onClick={() => setOpen((value) => !value)} className="glass grid size-9 place-items-center rounded-lg text-muted md:hidden">
+          {open ? <X size={17} /> : <Menu size={17} />}
+        </button>
+
+        {open && (
+          <div className="glass-strong absolute inset-x-0 top-[calc(100%+8px)] flex flex-col rounded-2xl p-2 md:hidden">
+            {links.map((link) => <a key={link.to} href={link.to} onClick={() => setOpen(false)} className="rounded-xl px-4 py-3 font-mono text-sm text-muted hover:bg-white/5 hover:text-cyan">{link.label}</a>)}
+          </div>
+        )}
       </nav>
     </motion.header>
   )
