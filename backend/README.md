@@ -14,7 +14,7 @@ Required GitHub environment secrets for `production`:
 - `VPS_HOST` — production VPS address
 - `VPS_PORT` — normally `22`
 - `VPS_USER` — normally `root`
-- `VPS_SSH_KEY` — private half of the VPS deploy key
+- `VPS_PASSWORD` — VPS login password (prefer replacing with a deploy key later)
 - `JWT_SECRET` — random secret of at least 32 characters
 - `OWNER_PASSWORD` — initial owner password
 
