@@ -1,8 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion, useScroll, useTransform } from 'framer-motion'
 import { ArrowRight, Globe2, Image as ImageIcon, FileText, MapPin, Sparkles } from 'lucide-react'
-import { GlobeScene } from '../components/globe/GlobeScene'
 import { PlaceCard } from '../components/globe/PlaceCard'
 import { PageShell, Reveal, CountUp, BackendBadge } from '../components/ui'
 import { TiltCard, Magnetic } from '../components/ui/Effects'
@@ -12,6 +11,9 @@ import { mockPlaces, mockProfile } from '../lib/mock'
 import { formatDate } from '../lib/utils'
 
 const typedPhrases = ['software engineer.', 'world wanderer.', 'pixel perfectionist.', 'phở enthusiast.', 'system architect.']
+const GlobeScene = lazy(() =>
+  import('../components/globe/GlobeScene').then((module) => ({ default: module.GlobeScene })),
+)
 
 function Typewriter() {
   const [text, setText] = useState('')
@@ -53,12 +55,18 @@ export function HomePage() {
   const [posts, setPosts] = useState<Post[]>([])
   const [photos, setPhotos] = useState<Photo[]>([])
   const [profile, setProfile] = useState<Profile>(mockProfile)
+  const [showGlobe, setShowGlobe] = useState(false)
 
   useEffect(() => {
     api.getPlaces().then(setPlaces)
     api.getPosts({ size: 3 }).then((p) => setPosts(p.content.slice(0, 3)))
     api.getPhotos().then((p) => setPhotos(p.filter((x) => x.featured).slice(0, 4)))
     api.getProfile().then(setProfile)
+  }, [])
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setShowGlobe(true), 1450)
+    return () => window.clearTimeout(timer)
   }, [])
 
   const marqueeSkills = useMemo(() => [...profile.skills, ...profile.skills], [profile.skills])
@@ -76,8 +84,19 @@ export function HomePage() {
       {/* ============ HERO ============ */}
       <section ref={heroRef} className="relative flex min-h-svh flex-col justify-center overflow-hidden">
         {/* globe canvas fills the hero, shifted right on desktop */}
-        <motion.div style={{ y: globeY, scale: globeScale, opacity: heroOpacity }} className="absolute inset-0 md:left-1/4">
-          <GlobeScene places={places} ambient className="size-full" />
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: showGlobe ? 1 : 0 }}
+          transition={{ duration: 0.7 }}
+          className="absolute inset-0 md:left-1/4"
+        >
+          <motion.div style={{ y: globeY, scale: globeScale, opacity: heroOpacity }} className="size-full">
+            {showGlobe && (
+              <Suspense fallback={null}>
+                <GlobeScene places={places} ambient className="size-full" />
+              </Suspense>
+            )}
+          </motion.div>
         </motion.div>
         {/* readability gradient over the left column */}
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-void via-void/70 to-transparent md:via-void/40" />

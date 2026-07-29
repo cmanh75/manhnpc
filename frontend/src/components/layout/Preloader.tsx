@@ -4,11 +4,11 @@ import { useAppStore } from '../../store/useAppStore'
 
 const bootLines = [
   { text: '$ manhnpc --boot', delay: 0 },
-  { text: '[ok] loading personal universe v2.0', delay: 320 },
-  { text: '[ok] mounting /memories … 9 countries found', delay: 640 },
-  { text: '[ok] spinning up planet earth (9,015 dots)', delay: 940 },
-  { text: '[ok] establishing uplink to hanoi, vietnam', delay: 1240 },
-  { text: '> welcome, traveler', delay: 1560 },
+  { text: '[ok] loading personal universe v2.0', delay: 200 },
+  { text: '[ok] mounting /memories … 9 countries found', delay: 400 },
+  { text: '[ok] spinning up planet earth (9,015 dots)', delay: 600 },
+  { text: '[ok] establishing uplink to hanoi, vietnam', delay: 800 },
+  { text: '> welcome, traveler', delay: 1000 },
 ]
 
 export function Preloader() {
@@ -21,7 +21,7 @@ export function Preloader() {
     const timers = bootLines.map((line, i) =>
       setTimeout(() => setVisibleLines(i + 1), line.delay),
     )
-    const done = setTimeout(() => setBooted(), 2100)
+    const done = setTimeout(() => setBooted(), 1250)
     return () => {
       timers.forEach(clearTimeout)
       clearTimeout(done)
@@ -33,8 +33,8 @@ export function Preloader() {
       {!booted && (
         <motion.div
           className="fixed inset-0 z-[100] grid place-items-center bg-void"
-          exit={{ opacity: 0, filter: 'blur(10px)' }}
-          transition={{ duration: 0.6, ease: 'easeInOut' }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.3, ease: 'easeOut' }}
         >
           <div className="w-[min(30rem,90vw)] font-mono text-sm">
             <div className="glass-strong rounded-2xl p-6">

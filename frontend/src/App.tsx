@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom'
 import { AnimatePresence } from 'framer-motion'
 import { Navbar } from './components/layout/Navbar'
@@ -9,16 +9,16 @@ import { Backdrop } from './components/layout/Backdrop'
 import { Preloader } from './components/layout/Preloader'
 import { CustomCursor } from './components/layout/CustomCursor'
 import { CommandPalette } from './components/layout/CommandPalette'
-import { HomePage } from './pages/HomePage'
-import { GlobePage } from './pages/GlobePage'
-import { GalleryPage } from './pages/GalleryPage'
-import { VideosPage } from './pages/VideosPage'
-import { BlogPage } from './pages/BlogPage'
-import { BlogPostPage } from './pages/BlogPostPage'
-import { GuestbookPage } from './pages/GuestbookPage'
-import { AboutPage } from './pages/AboutPage'
-import { LoginPage } from './pages/LoginPage'
-import { NotFoundPage } from './pages/NotFoundPage'
+const HomePage = lazy(() => import('./pages/HomePage').then((module) => ({ default: module.HomePage })))
+const GlobePage = lazy(() => import('./pages/GlobePage').then((module) => ({ default: module.GlobePage })))
+const GalleryPage = lazy(() => import('./pages/GalleryPage').then((module) => ({ default: module.GalleryPage })))
+const VideosPage = lazy(() => import('./pages/VideosPage').then((module) => ({ default: module.VideosPage })))
+const BlogPage = lazy(() => import('./pages/BlogPage').then((module) => ({ default: module.BlogPage })))
+const BlogPostPage = lazy(() => import('./pages/BlogPostPage').then((module) => ({ default: module.BlogPostPage })))
+const GuestbookPage = lazy(() => import('./pages/GuestbookPage').then((module) => ({ default: module.GuestbookPage })))
+const AboutPage = lazy(() => import('./pages/AboutPage').then((module) => ({ default: module.AboutPage })))
+const LoginPage = lazy(() => import('./pages/LoginPage').then((module) => ({ default: module.LoginPage })))
+const NotFoundPage = lazy(() => import('./pages/NotFoundPage').then((module) => ({ default: module.NotFoundPage })))
 
 function ScrollToTop() {
   const { pathname } = useLocation()
@@ -35,18 +35,20 @@ function AnimatedRoutes() {
   return (
     <>
       <AnimatePresence mode="wait">
-        <Routes location={location} key={location.pathname}>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/globe" element={<GlobePage />} />
-          <Route path="/gallery" element={<GalleryPage />} />
-          <Route path="/videos" element={<VideosPage />} />
-          <Route path="/blog" element={<BlogPage />} />
-          <Route path="/blog/:slug" element={<BlogPostPage />} />
-          <Route path="/guestbook" element={<GuestbookPage />} />
-          <Route path="/about" element={<AboutPage />} />
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="*" element={<NotFoundPage />} />
-        </Routes>
+        <Suspense fallback={<div className="min-h-svh" />}>
+          <Routes location={location} key={location.pathname}>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/globe" element={<GlobePage />} />
+            <Route path="/gallery" element={<GalleryPage />} />
+            <Route path="/videos" element={<VideosPage />} />
+            <Route path="/blog" element={<BlogPage />} />
+            <Route path="/blog/:slug" element={<BlogPostPage />} />
+            <Route path="/guestbook" element={<GuestbookPage />} />
+            <Route path="/about" element={<AboutPage />} />
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="*" element={<NotFoundPage />} />
+          </Routes>
+        </Suspense>
       </AnimatePresence>
       {/* the globe page is a fixed fullscreen scene — no footer there */}
       {!isGlobe && <Footer />}

@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useMemo, useRef } from 'react'
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls, Stars } from '@react-three/drei'
 import { EffectComposer, Bloom, Vignette } from '@react-three/postprocessing'
@@ -104,17 +104,25 @@ interface GlobeSceneProps {
 
 export function GlobeScene({ places, className, ambient = false }: GlobeSceneProps) {
   const controlsRef = useRef<OrbitControlsImpl | null>(null)
+  const [mobile, setMobile] = useState(() => window.matchMedia('(max-width: 767px)').matches)
+
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 767px)')
+    const update = () => setMobile(media.matches)
+    media.addEventListener('change', update)
+    return () => media.removeEventListener('change', update)
+  }, [])
 
   return (
     <div className={className}>
       <Canvas
-        dpr={[1, 2]}
+        dpr={mobile ? [1, 1.25] : [1, 2]}
         camera={{ position: [0, 0.9, 5.4], fov: 42 }}
         gl={{ antialias: true, powerPreference: 'high-performance', alpha: true }}
         style={{ background: 'transparent' }}
       >
         <Suspense fallback={null}>
-          <Stars radius={90} depth={50} count={ambient ? 2400 : 4200} factor={3.6} saturation={0} fade speed={0.5} />
+          <Stars radius={90} depth={50} count={mobile ? 1200 : ambient ? 2400 : 4200} factor={3.6} saturation={0} fade speed={0.5} />
           <Earth places={places} />
           <OrbitControls
             ref={controlsRef}
@@ -130,10 +138,12 @@ export function GlobeScene({ places, className, ambient = false }: GlobeScenePro
           />
           <CameraRig controlsRef={controlsRef} />
           <AutoRotateManager controlsRef={controlsRef} />
-          <EffectComposer multisampling={0}>
-            <Bloom intensity={ambient ? 0.55 : 0.8} luminanceThreshold={0.18} mipmapBlur radius={0.72} />
-            <Vignette eskil={false} offset={0.12} darkness={0.72} />
-          </EffectComposer>
+          {!(mobile && ambient) && (
+            <EffectComposer multisampling={0}>
+              <Bloom intensity={ambient ? 0.55 : 0.8} luminanceThreshold={0.18} mipmapBlur radius={0.72} />
+              <Vignette eskil={false} offset={0.12} darkness={0.72} />
+            </EffectComposer>
+          )}
         </Suspense>
       </Canvas>
     </div>
