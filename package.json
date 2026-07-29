@@ -1,0 +1,9 @@
+{
+  "name": "manhnpc-portfolio",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "build": "npm --prefix frontend ci --no-audit --no-fund && npm --prefix frontend run build && node scripts/prepare-site-build.mjs"
+  }
+}
