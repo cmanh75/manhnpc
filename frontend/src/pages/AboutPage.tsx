@@ -8,11 +8,10 @@ import type { Profile } from '../lib/types'
 import { mockProfile } from '../lib/mock'
 
 const timeline = [
-  { year: '2021', title: 'Joined Viettel', body: 'Started as a backend engineer on telco-scale systems. First on-call page at 3am: a rite of passage.' },
-  { year: '2022', title: 'Went distributed', body: 'Led the strangler-fig migration of a legacy monolith into Spring Cloud microservices. Learned that the database is the real boss fight.' },
-  { year: '2023', title: 'Remote experiments', body: 'Worked from Bali, Kuala Lumpur and too many cafés. Discovered that latency to prod is inversely proportional to ocean view quality.' },
-  { year: '2024', title: 'Full-stack era', body: 'Fell in love with React and WebGL. Started rendering planets for fun. This site is the evidence.' },
-  { year: '2026', title: 'Built this universe', body: 'Six microservices, one globe, zero regrets. A self-hosted home for everything I make and everywhere I go.' },
+  { year: '2019', title: 'Started at Ha Tinh High School for the Gifted', body: 'Studied mathematics and built the problem-solving foundation that led me into competitive programming and software.' },
+  { year: '2022', title: 'Began studying Computer Science at HUST', body: 'Started my Computer Science degree at Hanoi University of Science and Technology and earned a prize at the Vietnam Olympiad in Informatics.' },
+  { year: '2025', title: 'Joined Viettel Software', body: 'Started working as a Junior Software Engineer, building enterprise REST APIs and database-backed services with Java Spring Boot.' },
+  { year: '2026', title: 'Built this universe', body: 'Created a self-hosted place for my memories, journeys, photos, writing, and everything I make along the way.' },
 ]
 
 export function AboutPage() {
@@ -39,7 +38,7 @@ export function AboutPage() {
               <div className="relative">
                 <div className="absolute inset-0 animate-spin-slow rounded-full bg-[conic-gradient(from_0deg,#22d3ee,#a78bfa,#f472b6,#22d3ee)] blur-[6px]" />
                 <div className="relative grid size-28 place-items-center rounded-full bg-space ring-2 ring-white/10">
-                  <span className="font-display text-4xl font-bold text-gradient">K</span>
+                  <span className="font-display text-4xl font-bold text-gradient">M</span>
                 </div>
               </div>
               <div className="flex gap-2">

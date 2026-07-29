@@ -13,27 +13,26 @@ public class ProfileController {
     @GetMapping("/api/profile")
     public ProfileResponse profile() {
         Map<String, String> socials = new LinkedHashMap<>();
-        socials.put("github", "https://github.com/manhnpc");
-        socials.put("linkedin", "https://www.linkedin.com/in/manhnpc");
-        socials.put("email", "khanhnd75@viettel.com.vn");
+        socials.put("github", "https://github.com/cmanh75");
+        socials.put("linkedin", "https://www.linkedin.com/in/cmanh75/");
+        socials.put("email", "npcm752004t2k29@gmail.com");
 
         Map<String, Integer> stats = new LinkedHashMap<>();
-        stats.put("yearsOfExperience", 5);
-        stats.put("projectsCompleted", 20);
+        stats.put("yearsOfExperience", 1);
+        stats.put("projectsCompleted", 3);
         stats.put("countriesVisited", 9);
         stats.put("cupsOfCoffee", 9999);
 
         return new ProfileResponse(
-                "Nguyễn Đình Khánh",
+                "Nguyen Phi Cuong Manh",
                 "manhnpc",
-                "Software Engineer",
-                "Viettel",
+                "Junior Software Engineer",
+                "Viettel Software",
                 "Hanoi, Vietnam",
-                "Backend engineer who ships distributed systems by day and tends a digital garden by night. "
-                        + "I spend most of my time taming microservices, event streams, and the occasional memory leak. "
-                        + "When the deploy is green, you will find me chasing street food and new stamps for my passport.",
-                List.of("Java", "Spring Boot", "Microservices", "Kafka", "React", "TypeScript",
-                        "Docker", "Kubernetes", "PostgreSQL", "Redis", "AWS", "CI/CD"),
+                "I build software and keep the moments around it. This is my personal universe — "
+                        + "a self-hosted home for my photos, journeys, writing, and the things I create along the way.",
+                List.of("Java", "Spring Boot", "Python", "FastAPI", "ReactJS", "WebSocket",
+                        "PostgreSQL", "MariaDB", "Docker", "Git", "C", "C++"),
                 socials,
                 stats);
     }

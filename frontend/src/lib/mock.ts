@@ -340,21 +340,21 @@ export const mockVideos: Video[] = [
 ]
 
 export const mockProfile: Profile = {
-  name: 'Nguyễn Đình Khánh',
+  name: 'Nguyen Phi Cuong Manh',
   alias: 'manhnpc',
-  role: 'Software Engineer',
-  company: 'Viettel',
+  role: 'Junior Software Engineer',
+  company: 'Viettel Software',
   location: 'Hanoi, Vietnam',
-  bio: 'I build distributed systems by day and pixel-perfect interfaces by night. This is my corner of the internet — every photo, every trip, every line of writing, owned and self-hosted.',
-  skills: ['Java', 'Spring Boot', 'Microservices', 'Kafka', 'React', 'TypeScript', 'Three.js', 'Docker', 'Kubernetes', 'PostgreSQL', 'Redis', 'AWS', 'CI/CD'],
+  bio: 'I build software and keep the moments around it. This is my personal universe — a self-hosted home for my photos, journeys, writing, and the things I create along the way.',
+  skills: ['Java', 'Spring Boot', 'Python', 'FastAPI', 'ReactJS', 'WebSocket', 'PostgreSQL', 'MariaDB', 'Docker', 'Git', 'C', 'C++'],
   socials: {
-    github: 'https://github.com/manhnpc',
-    linkedin: 'https://linkedin.com/in/manhnpc',
-    email: 'khanhnd75@viettel.com.vn',
+    github: 'https://github.com/cmanh75',
+    linkedin: 'https://www.linkedin.com/in/cmanh75/',
+    email: 'npcm752004t2k29@gmail.com',
   },
   stats: {
-    yearsOfExperience: 5,
-    projectsCompleted: 20,
+    yearsOfExperience: 1,
+    projectsCompleted: 3,
     countriesVisited: 9,
     cupsOfCoffee: 9999,
   },

@@ -22,7 +22,7 @@ public class AuthServiceApplication {
             PasswordEncoder encoder,
             @Value("${owner.seed.username:manhnpc}") String username,
             @Value("${owner.seed.password}") String password,
-            @Value("${owner.seed.display-name:Nguyễn Đình Khánh}") String displayName) {
+            @Value("${owner.seed.display-name:Nguyen Phi Cuong Manh}") String displayName) {
         return args -> {
             if (users.count() == 0) {
                 User owner = User.builder()
