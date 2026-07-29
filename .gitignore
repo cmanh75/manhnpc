@@ -12,3 +12,5 @@ frontend/dist/
 backend/**/target/
 backend/uploads/
 backend/**/uploads/
+.firebase/
+/dist/
