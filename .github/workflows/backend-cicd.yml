@@ -1,0 +1,105 @@
+name: Backend CI/CD
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend-cicd.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: portfolio-backend-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+          cache-dependency-path: backend/pom.xml
+
+      - name: Compile backend
+        run: mvn -B -DskipTests compile
+
+      - name: Validate production Compose
+        env:
+          JWT_SECRET: ci-placeholder-at-least-32-characters
+          OWNER_PASSWORD: ci-placeholder
+        run: docker compose -f docker-compose.prod.yml config --quiet
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@v1.2.2
+        env:
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          OWNER_PASSWORD: ${{ secrets.OWNER_PASSWORD }}
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          envs: JWT_SECRET,OWNER_PASSWORD
+          command_timeout: 20m
+          script_stop: true
+          script: |
+            set -eu
+
+            REPO=/opt/manhnpc
+            BACKEND="$REPO/backend"
+            CADDY_REPO=/root/english-supporter-backend
+
+            if [ ! -d "$REPO/.git" ]; then
+              git clone https://github.com/cmanh75/manhnpc.git "$REPO"
+            fi
+
+            cd "$REPO"
+            git fetch origin main
+            git reset --hard origin/main
+
+            umask 077
+            {
+              printf 'JWT_SECRET=%s\n' "$JWT_SECRET"
+              printf 'OWNER_PASSWORD=%s\n' "$OWNER_PASSWORD"
+              printf 'OWNER_USERNAME=manhnpc\n'
+              printf 'OWNER_DISPLAY_NAME=Manh NPC\n'
+            } > "$BACKEND/.env"
+
+            docker network inspect english-supporter-backend_default >/dev/null
+
+            cd "$BACKEND"
+            docker compose -f docker-compose.prod.yml up -d --build --remove-orphans
+
+            if ! grep -q '^portfolio-api\.manhnpc\.com {' "$CADDY_REPO/Caddyfile"; then
+              {
+                printf '\nportfolio-api.manhnpc.com {\n'
+                printf '    reverse_proxy portfolio-api-gateway:8090\n'
+                printf '}\n'
+              } >> "$CADDY_REPO/Caddyfile"
+            fi
+
+            cd "$CADDY_REPO"
+            docker compose -f docker-compose.prod.yml exec -T caddy \
+              caddy reload --config /etc/caddy/Caddyfile
+
+            docker compose -f "$BACKEND/docker-compose.prod.yml" ps
+
+            unset JWT_SECRET OWNER_PASSWORD

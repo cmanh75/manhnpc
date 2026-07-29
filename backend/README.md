@@ -3,6 +3,25 @@
 Spring Boot 3 microservices backend for the **manhnpc** personal portfolio / life-archive website.
 The React frontend (http://localhost:5173) talks to the API gateway at http://localhost:8090.
 
+## Production deployment
+
+Pushes to `main` that change `backend/**` run `.github/workflows/backend-cicd.yml`.
+The workflow compiles all modules, validates the production Compose file, then
+deploys to `/opt/manhnpc` on the VPS.
+
+Required GitHub environment secrets for `production`:
+
+- `VPS_HOST` — production VPS address
+- `VPS_PORT` — normally `22`
+- `VPS_USER` — normally `root`
+- `VPS_SSH_KEY` — private half of the VPS deploy key
+- `JWT_SECRET` — random secret of at least 32 characters
+- `OWNER_PASSWORD` — initial owner password
+
+The API is served through the existing Caddy container at
+`https://portfolio-api.manhnpc.com`. Persistent H2 files and media uploads use
+named Docker volumes and survive deployments.
+
 ## Architecture
 
 ```
