@@ -4,11 +4,11 @@ import { Menu, Terminal, X } from 'lucide-react'
 import { clsx } from '../../lib/utils'
 
 const links = [
-  { to: '#about', label: 'Giới thiệu' },
-  { to: '#experience', label: 'Kinh nghiệm' },
-  { to: '#projects', label: 'Dự án' },
-  { to: '#skills', label: 'Kỹ năng' },
-  { to: '#contact', label: 'Liên hệ' },
+  { to: '#about', label: 'About' },
+  { to: '#experience', label: 'Experience' },
+  { to: '#projects', label: 'Projects' },
+  { to: '#skills', label: 'Skills' },
+  { to: '#contact', label: 'Contact' },
 ]
 
 export function Navbar() {
@@ -39,7 +39,7 @@ export function Navbar() {
           {links.map((link) => <a key={link.to} href={link.to} className="rounded-lg px-3 py-1.5 font-mono text-xs text-muted transition hover:bg-white/5 hover:text-cyan">{link.label}</a>)}
         </div>
 
-        <button type="button" aria-label="Mở menu" onClick={() => setOpen((value) => !value)} className="glass grid size-9 place-items-center rounded-lg text-muted md:hidden">
+        <button type="button" aria-label="Open menu" onClick={() => setOpen((value) => !value)} className="glass grid size-9 place-items-center rounded-lg text-muted md:hidden">
           {open ? <X size={17} /> : <Menu size={17} />}
         </button>
 
