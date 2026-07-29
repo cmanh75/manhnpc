@@ -1,14 +1,14 @@
-import { lazy, Suspense, useEffect } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom'
 import { AnimatePresence } from 'framer-motion'
 import { Navbar } from './components/layout/Navbar'
 import { SmoothScroll } from './components/layout/SmoothScroll'
-import { KonamiEgg } from './components/layout/KonamiEgg'
 import { Footer } from './components/layout/Footer'
 import { Backdrop } from './components/layout/Backdrop'
 import { Preloader } from './components/layout/Preloader'
 import { CustomCursor } from './components/layout/CustomCursor'
-import { CommandPalette } from './components/layout/CommandPalette'
+const CommandPalette = lazy(() => import('./components/layout/CommandPalette').then((module) => ({ default: module.CommandPalette })))
+const KonamiEgg = lazy(() => import('./components/layout/KonamiEgg').then((module) => ({ default: module.KonamiEgg })))
 const HomePage = lazy(() => import('./pages/HomePage').then((module) => ({ default: module.HomePage })))
 const GlobePage = lazy(() => import('./pages/GlobePage').then((module) => ({ default: module.GlobePage })))
 const GalleryPage = lazy(() => import('./pages/GalleryPage').then((module) => ({ default: module.GalleryPage })))
@@ -19,6 +19,23 @@ const GuestbookPage = lazy(() => import('./pages/GuestbookPage').then((module) =
 const AboutPage = lazy(() => import('./pages/AboutPage').then((module) => ({ default: module.AboutPage })))
 const LoginPage = lazy(() => import('./pages/LoginPage').then((module) => ({ default: module.LoginPage })))
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage').then((module) => ({ default: module.NotFoundPage })))
+
+function DeferredEnhancements() {
+  const [ready, setReady] = useState(false)
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setReady(true), 2200)
+    return () => window.clearTimeout(timer)
+  }, [])
+
+  if (!ready) return null
+  return (
+    <Suspense fallback={null}>
+      <CommandPalette />
+      <KonamiEgg />
+    </Suspense>
+  )
+}
 
 function ScrollToTop() {
   const { pathname } = useLocation()
@@ -65,8 +82,7 @@ export default function App() {
       <Preloader />
       <CustomCursor />
       <Navbar />
-      <CommandPalette />
-      <KonamiEgg />
+      <DeferredEnhancements />
       <AnimatedRoutes />
     </BrowserRouter>
   )

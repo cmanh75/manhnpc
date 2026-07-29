@@ -1,6 +1,8 @@
 import axios from 'axios'
 import type { VisitedPlace, TravelStats, Post, PagedPosts, Photo, Video, Profile, GuestbookEntry } from './types'
 import { mockPlaces, mockTravelStats, mockPosts, mockPhotos, mockVideos, mockProfile } from './mock'
+import { authSession, type OwnerSession } from './auth-session'
+export type { OwnerSession } from './auth-session'
 
 /**
  * API layer with graceful degradation:
@@ -14,7 +16,7 @@ const client = axios.create({ baseURL: configuredApiBaseUrl || '/api', timeout: 
 
 // attach the owner token (if logged in) to every request
 client.interceptors.request.use((config) => {
-  const token = auth.getToken()
+  const token = authSession.token()
   if (token) config.headers.Authorization = `Bearer ${token}`
   return config
 })
@@ -110,24 +112,12 @@ function filterMockPosts(params?: { tag?: string; q?: string }): Post[] {
 
 /* ---------- owner auth (JWT via auth-service) ---------- */
 
-const AUTH_KEY = 'manhnpc.auth'
-
-export interface OwnerSession {
-  token: string
-  user: { id: number; username: string; displayName: string; avatarUrl?: string }
-}
-
 export const auth = {
   getSession(): OwnerSession | null {
-    try {
-      const raw = localStorage.getItem(AUTH_KEY)
-      return raw ? JSON.parse(raw) : null
-    } catch {
-      return null
-    }
+    return authSession.get()
   },
   getToken(): string | null {
-    return auth.getSession()?.token ?? null
+    return authSession.token()
   },
   isOwner(): boolean {
     return !!auth.getToken()
@@ -136,11 +126,11 @@ export const auth = {
     // deliberate direct call, no fallback — login is meaningless offline
     const { data } = await client.post('/auth/login', { username, password })
     const session: OwnerSession = { token: data.token, user: data.user }
-    localStorage.setItem(AUTH_KEY, JSON.stringify(session))
+    authSession.save(session)
     return session
   },
   logout() {
-    localStorage.removeItem(AUTH_KEY)
+    authSession.clear()
   },
 }
 

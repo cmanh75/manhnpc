@@ -65,24 +65,27 @@ const dotsFragment = /* glsl */ `
   }
 `
 
-function LandDots() {
+function LandDots({ density = 1 }: { density?: number }) {
   const dots = useLandDots()
   const matRef = useRef<THREE.ShaderMaterial>(null)
 
   const { positions, seeds } = useMemo(() => {
     if (!dots) return { positions: new Float32Array(0), seeds: new Float32Array(0) }
-    const count = dots.length / 2
+    const sourceCount = dots.length / 2
+    const step = Math.max(1, Math.round(1 / density))
+    const count = Math.ceil(sourceCount / step)
     const positions = new Float32Array(count * 3)
     const seeds = new Float32Array(count)
     for (let i = 0; i < count; i++) {
-      const [x, y, z] = latLngToVector3(dots[i * 2], dots[i * 2 + 1], GLOBE_RADIUS * 1.004)
+      const sourceIndex = Math.min(i * step, sourceCount - 1)
+      const [x, y, z] = latLngToVector3(dots[sourceIndex * 2], dots[sourceIndex * 2 + 1], GLOBE_RADIUS * 1.004)
       positions[i * 3] = x
       positions[i * 3 + 1] = y
       positions[i * 3 + 2] = z
       seeds[i] = (i * 0.618033) % 1
     }
     return { positions, seeds }
-  }, [dots])
+  }, [dots, density])
 
   const uniforms = useMemo(
     () => ({
@@ -451,7 +454,7 @@ function Arcs({ places }: { places: VisitedPlace[] }) {
 /*  Earth — the full assembly                                          */
 /* ================================================================== */
 
-export function Earth({ places }: { places: VisitedPlace[] }) {
+export function Earth({ places, dotDensity = 1 }: { places: VisitedPlace[]; dotDensity?: number }) {
   const groupRef = useRef<THREE.Group>(null)
   const selectedPlace = useAppStore((s) => s.selectedPlace)
   const setSelectedPlace = useAppStore((s) => s.setSelectedPlace)
@@ -459,7 +462,7 @@ export function Earth({ places }: { places: VisitedPlace[] }) {
   return (
     <group ref={groupRef}>
       <GlobeBody />
-      <LandDots />
+      <LandDots density={dotDensity} />
       <Atmosphere />
       <Arcs places={places} />
       {places.map((place, i) => (

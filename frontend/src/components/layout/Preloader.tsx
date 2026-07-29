@@ -4,29 +4,50 @@ import { useAppStore } from '../../store/useAppStore'
 
 const bootLines = [
   { text: '$ manhnpc --boot', delay: 0 },
-  { text: '[ok] loading personal universe v2.0', delay: 200 },
-  { text: '[ok] mounting /memories … 9 countries found', delay: 400 },
-  { text: '[ok] spinning up planet earth (9,015 dots)', delay: 600 },
-  { text: '[ok] establishing uplink to hanoi, vietnam', delay: 800 },
-  { text: '> welcome, traveler', delay: 1000 },
+  { text: '[ok] loading personal universe v2.0', delay: 150 },
+  { text: '[ok] mounting /memories … 9 countries found', delay: 300 },
+  { text: '[ok] spinning up planet earth (9,015 dots)', delay: 450 },
+  { text: '[ok] establishing uplink to hanoi, vietnam', delay: 600 },
+  { text: '> welcome, traveler', delay: 750 },
 ]
 
 export function Preloader() {
   const booted = useAppStore((s) => s.booted)
   const setBooted = useAppStore((s) => s.setBooted)
   const [visibleLines, setVisibleLines] = useState(0)
+  const [skip] = useState(() => {
+    if (window.matchMedia('(max-width: 767px), (prefers-reduced-motion: reduce)').matches) return true
+    try {
+      return sessionStorage.getItem('manhnpc.booted') === '1'
+    } catch {
+      return false
+    }
+  })
 
   useEffect(() => {
     if (booted) return
+    if (skip) {
+      setBooted()
+      return
+    }
     const timers = bootLines.map((line, i) =>
       setTimeout(() => setVisibleLines(i + 1), line.delay),
     )
-    const done = setTimeout(() => setBooted(), 1250)
+    const done = setTimeout(() => {
+      try {
+        sessionStorage.setItem('manhnpc.booted', '1')
+      } catch {
+        // Storage may be unavailable in private browsing.
+      }
+      setBooted()
+    }, 900)
     return () => {
       timers.forEach(clearTimeout)
       clearTimeout(done)
     }
-  }, [booted, setBooted])
+  }, [booted, setBooted, skip])
+
+  if (skip) return null
 
   return (
     <AnimatePresence>

@@ -15,5 +15,11 @@ export default defineConfig({
   },
   build: {
     chunkSizeWarningLimit: 1600,
+    modulePreload: {
+      resolveDependencies: (_filename, dependencies) =>
+        dependencies.filter(
+          (dependency) => !dependency.includes('/api-') && !dependency.includes('/GlobeScene-'),
+        ),
+    },
   },
 })

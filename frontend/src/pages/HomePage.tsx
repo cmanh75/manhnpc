@@ -5,15 +5,24 @@ import { ArrowRight, Globe2, Image as ImageIcon, FileText, MapPin, Sparkles } fr
 import { PlaceCard } from '../components/globe/PlaceCard'
 import { PageShell, Reveal, CountUp, BackendBadge } from '../components/ui'
 import { TiltCard, Magnetic } from '../components/ui/Effects'
-import { api } from '../lib/api'
 import type { VisitedPlace, Post, Photo, Profile } from '../lib/types'
-import { mockPlaces, mockProfile } from '../lib/mock'
 import { formatDate } from '../lib/utils'
 
 const typedPhrases = ['software engineer.', 'world wanderer.', 'pixel perfectionist.', 'phở enthusiast.', 'system architect.']
 const GlobeScene = lazy(() =>
   import('../components/globe/GlobeScene').then((module) => ({ default: module.GlobeScene })),
 )
+const initialProfile: Profile = {
+  name: 'Nguyen Phi Cuong Manh',
+  alias: 'manhnpc',
+  role: 'Junior Software Engineer',
+  company: 'Viettel Software',
+  location: 'Hanoi, Vietnam',
+  bio: 'I build software and keep the moments around it. This is my personal universe — a self-hosted home for my photos, journeys, writing, and the things I create along the way.',
+  skills: ['Java', 'Spring Boot', 'ReactJS', 'Docker', 'PostgreSQL'],
+  socials: {},
+  stats: { yearsOfExperience: 1, projectsCompleted: 3, countriesVisited: 9, cupsOfCoffee: 9999 },
+}
 
 function Typewriter() {
   const [text, setText] = useState('')
@@ -51,21 +60,37 @@ function Typewriter() {
 }
 
 export function HomePage() {
-  const [places, setPlaces] = useState<VisitedPlace[]>(mockPlaces)
+  const [places, setPlaces] = useState<VisitedPlace[]>([])
   const [posts, setPosts] = useState<Post[]>([])
   const [photos, setPhotos] = useState<Photo[]>([])
-  const [profile, setProfile] = useState<Profile>(mockProfile)
+  const [profile, setProfile] = useState<Profile>(initialProfile)
   const [showGlobe, setShowGlobe] = useState(false)
 
   useEffect(() => {
-    api.getPlaces().then(setPlaces)
-    api.getPosts({ size: 3 }).then((p) => setPosts(p.content.slice(0, 3)))
-    api.getPhotos().then((p) => setPhotos(p.filter((x) => x.featured).slice(0, 4)))
-    api.getProfile().then(setProfile)
+    let cancelled = false
+    const load = async () => {
+      const { api } = await import('../lib/api')
+      const [nextPlaces, nextPosts, nextPhotos, nextProfile] = await Promise.all([
+        api.getPlaces(),
+        api.getPosts({ size: 3 }),
+        api.getPhotos(),
+        api.getProfile(),
+      ])
+      if (cancelled) return
+      setPlaces(nextPlaces)
+      setPosts(nextPosts.content.slice(0, 3))
+      setPhotos(nextPhotos.filter((photo) => photo.featured).slice(0, 4))
+      setProfile(nextProfile)
+    }
+    const timer = window.setTimeout(load, 450)
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+    }
   }, [])
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setShowGlobe(true), 1450)
+    const timer = window.setTimeout(() => setShowGlobe(true), 900)
     return () => window.clearTimeout(timer)
   }, [])
 

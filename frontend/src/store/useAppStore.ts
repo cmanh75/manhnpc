@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import type { VisitedPlace } from '../lib/types'
-import { auth, type OwnerSession } from '../lib/api'
+import { authSession, type OwnerSession } from '../lib/auth-session'
 
 interface AppState {
   selectedPlace: VisitedPlace | null
@@ -26,6 +26,6 @@ export const useAppStore = create<AppState>((set) => ({
   booted: false,
   setBooted: () => set({ booted: true }),
 
-  owner: auth.getSession(),
+  owner: authSession.get(),
   setOwner: (owner) => set({ owner }),
 }))

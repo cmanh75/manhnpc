@@ -123,7 +123,7 @@ export function GlobeScene({ places, className, ambient = false }: GlobeScenePro
       >
         <Suspense fallback={null}>
           <Stars radius={90} depth={50} count={mobile ? 1200 : ambient ? 2400 : 4200} factor={3.6} saturation={0} fade speed={0.5} />
-          <Earth places={places} />
+          <Earth places={places} dotDensity={mobile ? (ambient ? 0.4 : 0.65) : 1} />
           <OrbitControls
             ref={controlsRef}
             enablePan={false}
