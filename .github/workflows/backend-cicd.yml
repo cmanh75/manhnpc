@@ -47,6 +47,20 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Upload backend source
+        uses: appleboy/scp-action@v1.0.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          port: ${{ secrets.VPS_PORT }}
+          source: "backend"
+          target: "/opt/manhnpc"
+          overwrite: true
+
       - name: Deploy to VPS
         uses: appleboy/ssh-action@v1.2.2
         env:
@@ -59,21 +73,12 @@ jobs:
           port: ${{ secrets.VPS_PORT }}
           envs: JWT_SECRET,OWNER_PASSWORD
           command_timeout: 20m
-          script_stop: true
           script: |
             set -eu
 
             REPO=/opt/manhnpc
             BACKEND="$REPO/backend"
             CADDY_REPO=/root/english-supporter-backend
-
-            if [ ! -d "$REPO/.git" ]; then
-              git clone https://github.com/cmanh75/manhnpc.git "$REPO"
-            fi
-
-            cd "$REPO"
-            git fetch origin main
-            git reset --hard origin/main
 
             umask 077
             {
