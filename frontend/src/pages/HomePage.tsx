@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import { GithubIcon, LinkedinIcon } from '../components/ui/BrandIcons'
 import { Reveal } from '../components/ui'
+import { GlobeScene } from '../components/globe/GlobeScene'
 
 const experience = {
   period: '07/2025 — Present',
@@ -79,12 +80,24 @@ function SectionTitle({ eyebrow, title }: { eyebrow: string; title: string }) {
 export function HomePage() {
   return (
     <main className="relative z-10">
-      <section id="about" className="mx-auto flex min-h-svh max-w-6xl items-center px-6 pb-20 pt-32 md:px-10">
+      <section id="about" className="relative flex min-h-svh items-center overflow-hidden">
+        <div className="absolute inset-0 md:left-[28%]">
+          <GlobeScene places={[]} ambient className="size-full" />
+        </div>
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-void via-void/85 to-void/20 md:via-void/60" />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-void to-transparent" />
+
+        <div className="relative z-10 mx-auto flex w-full max-w-6xl items-center px-6 pb-20 pt-32 md:px-10">
         <motion.div
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7 }}
+          className="max-w-3xl"
         >
+          <div className="mb-5 inline-flex items-center gap-2 rounded-full bg-cyan/10 px-3 py-1 font-mono text-xs text-cyan ring-1 ring-cyan/30">
+            <span className="size-1.5 rounded-full bg-mint shadow-[0_0_7px_#34d399]" />
+            available for software engineering opportunities
+          </div>
           <p className="mb-4 font-mono text-sm text-cyan">Hello, I&apos;m</p>
           <h1 className="font-display text-5xl font-bold leading-[1.03] tracking-tight md:text-7xl">
             Nguyễn Phi
@@ -112,7 +125,17 @@ export function HomePage() {
             <a className="inline-flex items-center gap-2 transition hover:text-cyan" href="tel:+84973772148"><Phone size={15} className="text-violet" /> 0973 772 148</a>
           </div>
         </motion.div>
-
+        </div>
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1.2 }}
+          className="pointer-events-none absolute bottom-8 left-1/2 z-10 -translate-x-1/2 font-mono text-[11px] text-faint"
+        >
+          <motion.span animate={{ y: [0, 7, 0] }} transition={{ repeat: Infinity, duration: 1.8 }} className="inline-block">
+            ↓ scroll to explore
+          </motion.span>
+        </motion.div>
       </section>
 
       <div className="mx-auto max-w-6xl space-y-28 px-6 pb-16 md:px-10">
