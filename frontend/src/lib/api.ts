@@ -98,6 +98,44 @@ export const api = {
   async getProfile(): Promise<Profile> {
     return withFallback(async () => (await client.get('/profile')).data, mockProfile)
   },
+
+  /* ---------- media uploads: owner-only, no offline fallback ---------- */
+
+  async uploadPhoto(file: File, meta: { title: string; description?: string; category: string; location?: string }): Promise<Photo> {
+    const form = new FormData()
+    form.append('file', file)
+    form.append('title', meta.title)
+    if (meta.description) form.append('description', meta.description)
+    form.append('category', meta.category)
+    if (meta.location) form.append('location', meta.location)
+    const { data } = await client.post('/media/photos/upload', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 60_000,
+    })
+    return data as Photo
+  },
+
+  async uploadVideo(file: File, meta: { title: string; description?: string; category: string; durationSeconds?: number }): Promise<Video> {
+    const form = new FormData()
+    form.append('file', file)
+    form.append('title', meta.title)
+    if (meta.description) form.append('description', meta.description)
+    form.append('category', meta.category)
+    if (meta.durationSeconds) form.append('durationSeconds', String(meta.durationSeconds))
+    const { data } = await client.post('/media/videos/upload', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 180_000,
+    })
+    return data as Video
+  },
+
+  async deletePhoto(id: number): Promise<void> {
+    await client.delete(`/media/photos/${id}`)
+  },
+
+  async deleteVideo(id: number): Promise<void> {
+    await client.delete(`/media/videos/${id}`)
+  },
 }
 
 function filterMockPosts(params?: { tag?: string; q?: string }): Post[] {

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Globe2, Home, Image, Video, FileText, User, MessageSquare, Search, CornerDownLeft, Sparkles, Lock, MapPin } from 'lucide-react'
+import { Globe2, Home, Image, FileText, User, MessageSquare, Search, CornerDownLeft, Sparkles, Lock, MapPin } from 'lucide-react'
 import { GithubIcon } from '../ui/BrandIcons'
 import { MatrixRain } from '../ui/Effects'
 import { useAppStore } from '../../store/useAppStore'
@@ -39,8 +39,7 @@ export function CommandPalette() {
     () => [
       { id: 'home', label: 'Go home', hint: '/', icon: <Home size={15} />, action: () => navigate('/') },
       { id: 'globe', label: 'Spin the globe', hint: '/globe', icon: <Globe2 size={15} />, action: () => navigate('/globe') },
-      { id: 'gallery', label: 'Browse gallery', hint: '/gallery', icon: <Image size={15} />, action: () => navigate('/gallery') },
-      { id: 'videos', label: 'Watch videos', hint: '/videos', icon: <Video size={15} />, action: () => navigate('/videos') },
+      { id: 'gallery', label: 'Browse the feed', hint: '/gallery', icon: <Image size={15} />, action: () => navigate('/gallery') },
       { id: 'blog', label: 'Read the blog', hint: '/blog', icon: <FileText size={15} />, action: () => navigate('/blog') },
       { id: 'guestbook', label: 'Sign the guestbook', hint: '/guestbook', icon: <MessageSquare size={15} />, action: () => navigate('/guestbook') },
       { id: 'about', label: 'About me', hint: '/about', icon: <User size={15} />, action: () => navigate('/about') },

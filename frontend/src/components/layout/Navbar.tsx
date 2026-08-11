@@ -9,7 +9,6 @@ const links = [
   { to: '/', label: 'home', end: true },
   { to: '/globe', label: 'globe' },
   { to: '/gallery', label: 'gallery' },
-  { to: '/videos', label: 'videos' },
   { to: '/blog', label: 'blog' },
   { to: '/guestbook', label: 'guestbook' },
   { to: '/about', label: 'about' },

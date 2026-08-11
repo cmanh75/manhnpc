@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
-import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { AnimatePresence } from 'framer-motion'
 import { Navbar } from './components/layout/Navbar'
 import { SmoothScroll } from './components/layout/SmoothScroll'
@@ -12,7 +12,6 @@ const KonamiEgg = lazy(() => import('./components/layout/KonamiEgg').then((modul
 const HomePage = lazy(() => import('./pages/HomePage').then((module) => ({ default: module.HomePage })))
 const GlobePage = lazy(() => import('./pages/GlobePage').then((module) => ({ default: module.GlobePage })))
 const GalleryPage = lazy(() => import('./pages/GalleryPage').then((module) => ({ default: module.GalleryPage })))
-const VideosPage = lazy(() => import('./pages/VideosPage').then((module) => ({ default: module.VideosPage })))
 const BlogPage = lazy(() => import('./pages/BlogPage').then((module) => ({ default: module.BlogPage })))
 const BlogPostPage = lazy(() => import('./pages/BlogPostPage').then((module) => ({ default: module.BlogPostPage })))
 const GuestbookPage = lazy(() => import('./pages/GuestbookPage').then((module) => ({ default: module.GuestbookPage })))
@@ -58,7 +57,7 @@ function AnimatedRoutes() {
             <Route path="/" element={<HomePage />} />
             <Route path="/globe" element={<GlobePage />} />
             <Route path="/gallery" element={<GalleryPage />} />
-            <Route path="/videos" element={<VideosPage />} />
+            <Route path="/videos" element={<Navigate to="/gallery" replace />} />
             <Route path="/blog" element={<BlogPage />} />
             <Route path="/blog/:slug" element={<BlogPostPage />} />
             <Route path="/guestbook" element={<GuestbookPage />} />
