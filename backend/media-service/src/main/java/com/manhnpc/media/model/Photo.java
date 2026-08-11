@@ -44,6 +44,7 @@ public class Photo {
     private String groupId;
 
     /** Order within {@link #groupId}; 0 for standalone photos. */
+    @Column(name = "sort_position")
     @Builder.Default
     private int position = 0;
 
