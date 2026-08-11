@@ -9,6 +9,7 @@ import org.springframework.web.multipart.MultipartFile;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.http.urlconnection.UrlConnectionHttpClient;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
@@ -36,6 +37,11 @@ public class R2StorageService {
                 .endpointOverride(URI.create("https://" + accountId + ".r2.cloudflarestorage.com"))
                 .region(Region.of("auto"))
                 .forcePathStyle(true)
+                // pin the HTTP client explicitly — SdkDefaultClientBuilder's auto-discovery
+                // prefers apache5-client when it's transitively present, but that module
+                // requires org.apache.httpcomponents.client5:httpclient5 as a *separate*
+                // dependency we don't carry, so auto-discovery throws NoClassDefFoundError.
+                .httpClientBuilder(UrlConnectionHttpClient.builder())
                 .credentialsProvider(StaticCredentialsProvider.create(
                         AwsBasicCredentials.create(accessKeyId, secretAccessKey)))
                 .build();
