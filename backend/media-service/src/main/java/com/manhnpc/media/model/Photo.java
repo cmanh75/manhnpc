@@ -43,10 +43,10 @@ public class Photo {
     /** Shared by every photo in the same multi-photo post; null for standalone photos. */
     private String groupId;
 
-    /** Order within {@link #groupId}; 0 for standalone photos. */
+    /** Order within {@link #groupId}; null/0 for standalone photos or rows predating this column. */
     @Column(name = "sort_position")
     @Builder.Default
-    private int position = 0;
+    private Integer position = 0;
 
     /** One of: travel, food, code, life. */
     private String category;
