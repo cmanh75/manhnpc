@@ -10,7 +10,9 @@ import com.manhnpc.media.web.error.NotFoundException;
 import java.io.IOException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -72,6 +74,37 @@ public class MediaController {
                 .featured(false)
                 .build();
         return photos.save(photo);
+    }
+
+    @PostMapping("/photos/upload-batch")
+    @ResponseStatus(HttpStatus.CREATED)
+    public List<Photo> uploadPhotoBatch(@RequestParam("files") List<MultipartFile> files,
+                                        @RequestParam(defaultValue = "Untitled photo") String title,
+                                        @RequestParam(required = false) String description,
+                                        @RequestParam(defaultValue = "life") String category,
+                                        @RequestParam(required = false) String location) throws IOException {
+        String groupId = files.size() > 1 ? UUID.randomUUID().toString() : null;
+        List<Photo> saved = new ArrayList<>();
+        for (int i = 0; i < files.size(); i++) {
+            UploadResult result = storage.upload(files.get(i), "photos");
+            Photo photo = Photo.builder()
+                    .title(title)
+                    .description(description)
+                    .url(result.url())
+                    .thumbnailUrl(result.url())
+                    .storageKey(result.key())
+                    .groupId(groupId)
+                    .position(i)
+                    .category(category)
+                    .location(location)
+                    .takenAt(LocalDate.now())
+                    .width(0)
+                    .height(0)
+                    .featured(false)
+                    .build();
+            saved.add(photos.save(photo));
+        }
+        return saved;
     }
 
     @PostMapping("/videos/upload")

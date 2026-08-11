@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { X, ChevronLeft, ChevronRight, MapPin, Calendar, Search, Plus, Trash2, Upload, Play, Clock } from 'lucide-react'
@@ -13,14 +13,54 @@ const uploadCategories = categories.filter((c) => c !== 'all')
 
 type FeedItem =
   | { kind: 'photo'; id: number; date: string; category: string; photo: Photo }
+  | { kind: 'photo-group'; id: number; date: string; category: string; photos: Photo[] }
   | { kind: 'video'; id: number; date: string; category: string; video: Video }
 
+/** One entry per individually viewable photo/video, in feed order — what the fullscreen viewer navigates. */
+type ViewerItem =
+  | { kind: 'photo'; id: number; date: string; photo: Photo }
+  | { kind: 'video'; id: number; date: string; video: Video }
+
 function toFeed(photos: Photo[], videos: Video[]): FeedItem[] {
+  const standalone: Photo[] = []
+  const groups = new Map<string, Photo[]>()
+  for (const photo of photos) {
+    if (photo.groupId) {
+      const group = groups.get(photo.groupId) ?? []
+      group.push(photo)
+      groups.set(photo.groupId, group)
+    } else {
+      standalone.push(photo)
+    }
+  }
+
   const items: FeedItem[] = [
-    ...photos.map((photo): FeedItem => ({ kind: 'photo', id: photo.id, date: photo.takenAt, category: photo.category, photo })),
+    ...standalone.map((photo): FeedItem => ({ kind: 'photo', id: photo.id, date: photo.takenAt, category: photo.category, photo })),
+    ...[...groups.values()].map((group): FeedItem => {
+      const sorted = [...group].sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+      const first = sorted[0]
+      return { kind: 'photo-group', id: first.id, date: first.takenAt, category: first.category, photos: sorted }
+    }),
     ...videos.map((video): FeedItem => ({ kind: 'video', id: video.id, date: video.createdAt, category: video.category, video })),
   ]
   return items.sort((a, b) => b.date.localeCompare(a.date))
+}
+
+/** Flattens the feed into individually-viewable items, plus each feed item's starting index into that flat list. */
+function toViewer(feed: FeedItem[]): { viewerItems: ViewerItem[]; startIndex: number[] } {
+  const viewerItems: ViewerItem[] = []
+  const startIndex: number[] = []
+  for (const item of feed) {
+    startIndex.push(viewerItems.length)
+    if (item.kind === 'photo') {
+      viewerItems.push({ kind: 'photo', id: item.photo.id, date: item.photo.takenAt, photo: item.photo })
+    } else if (item.kind === 'photo-group') {
+      for (const photo of item.photos) viewerItems.push({ kind: 'photo', id: photo.id, date: photo.takenAt, photo })
+    } else {
+      viewerItems.push({ kind: 'video', id: item.video.id, date: item.video.createdAt, video: item.video })
+    }
+  }
+  return { viewerItems, startIndex }
 }
 
 function emptyUploadForm() {
@@ -31,8 +71,55 @@ function emptyUploadForm() {
     category: 'life' as (typeof uploadCategories)[number],
     location: '',
     durationSeconds: '',
-    file: null as File | null,
+    files: [] as File[],
   }
+}
+
+/** Instagram-style swipeable carousel embedded in a feed card, with dot indicators. */
+function PhotoGroupCarousel({ photos, title, onOpen }: { photos: Photo[]; title: string; onOpen: (index: number) => void }) {
+  const [active, setActive] = useState(0)
+  const trackRef = useRef<HTMLDivElement>(null)
+
+  function handleScroll() {
+    const el = trackRef.current
+    if (!el) return
+    const index = Math.round(el.scrollLeft / el.clientWidth)
+    setActive(Math.min(photos.length - 1, Math.max(0, index)))
+  }
+
+  return (
+    <div className="relative">
+      <div
+        ref={trackRef}
+        onScroll={handleScroll}
+        className="flex snap-x snap-mandatory overflow-x-auto scroll-smooth [&::-webkit-scrollbar]:hidden"
+        style={{ scrollbarWidth: 'none' }}
+      >
+        {photos.map((photo, i) => (
+          <button key={photo.id} onClick={() => onOpen(i)} className="block w-full flex-none snap-center" data-cursor="pointer">
+            <img
+              src={photo.thumbnailUrl}
+              alt={title}
+              loading="lazy"
+              className="max-h-[560px] w-full object-cover"
+            />
+          </button>
+        ))}
+      </div>
+      {photos.length > 1 && (
+        <>
+          <span className="absolute right-3 top-3 rounded-md bg-black/60 px-2 py-1 font-mono text-[11px] text-ink backdrop-blur">
+            {active + 1}/{photos.length}
+          </span>
+          <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 gap-1.5">
+            {photos.map((_, i) => (
+              <span key={i} className={clsx('size-1.5 rounded-full transition', i === active ? 'bg-white' : 'bg-white/40')} />
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  )
 }
 
 export function GalleryPage() {
@@ -62,44 +149,52 @@ export function GalleryPage() {
     if (query.trim()) {
       const q = query.toLowerCase()
       list = list.filter((item) => {
-        const title = item.kind === 'photo' ? item.photo.title : item.video.title
-        const description = item.kind === 'photo' ? item.photo.description : item.video.description
-        const location = item.kind === 'photo' ? item.photo.location : ''
+        const title = item.kind === 'video' ? item.video.title : item.kind === 'photo' ? item.photo.title : item.photos[0].title
+        const description = item.kind === 'video' ? item.video.description : item.kind === 'photo' ? item.photo.description : item.photos[0].description
+        const location = item.kind === 'photo' ? item.photo.location : item.kind === 'photo-group' ? item.photos[0].location : ''
         return title.toLowerCase().includes(q) || description.toLowerCase().includes(q) || location.toLowerCase().includes(q)
       })
     }
     return list
   }, [feed, category, query])
 
+  const { viewerItems, startIndex } = useMemo(() => toViewer(filtered), [filtered])
+
   // keyboard navigation for the fullscreen viewer
   useEffect(() => {
     if (lightbox === null) return
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setLightbox(null)
-      if (e.key === 'ArrowRight') setLightbox((i) => (i === null ? null : (i + 1) % filtered.length))
-      if (e.key === 'ArrowLeft') setLightbox((i) => (i === null ? null : (i - 1 + filtered.length) % filtered.length))
+      if (e.key === 'ArrowRight') setLightbox((i) => (i === null ? null : (i + 1) % viewerItems.length))
+      if (e.key === 'ArrowLeft') setLightbox((i) => (i === null ? null : (i - 1 + viewerItems.length) % viewerItems.length))
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [lightbox, filtered.length])
+  }, [lightbox, viewerItems.length])
 
-  const current = lightbox !== null ? filtered[lightbox] : null
+  const current = lightbox !== null ? viewerItems[lightbox] : null
+
+  const previewUrls = useMemo(
+    () => (uploadForm.type === 'photo' ? uploadForm.files.map((f) => URL.createObjectURL(f)) : []),
+    [uploadForm.files, uploadForm.type],
+  )
+  useEffect(() => () => previewUrls.forEach((u) => URL.revokeObjectURL(u)), [previewUrls])
 
   async function submitUpload() {
-    if (!uploadForm.file || !uploadForm.title.trim()) return
+    if (uploadForm.files.length === 0 || !uploadForm.title.trim()) return
     setUploading(true)
     setUploadError(null)
     try {
       if (uploadForm.type === 'photo') {
-        const photo = await api.uploadPhoto(uploadForm.file, {
+        const uploaded = await api.uploadPhotos(uploadForm.files, {
           title: uploadForm.title.trim(),
           description: uploadForm.description.trim() || undefined,
           category: uploadForm.category,
           location: uploadForm.location.trim() || undefined,
         })
-        setPhotos((prev) => [photo, ...prev])
+        setPhotos((prev) => [...uploaded, ...prev])
       } else {
-        const video = await api.uploadVideo(uploadForm.file, {
+        const video = await api.uploadVideo(uploadForm.files[0], {
           title: uploadForm.title.trim(),
           description: uploadForm.description.trim() || undefined,
           category: uploadForm.category,
@@ -197,8 +292,9 @@ export function GalleryPage() {
       <div className="mx-auto flex max-w-xl flex-col gap-6">
         <AnimatePresence mode="popLayout">
           {filtered.map((item, i) => {
-            const title = item.kind === 'photo' ? item.photo.title : item.video.title
-            const description = item.kind === 'photo' ? item.photo.description : item.video.description
+            const title = item.kind === 'video' ? item.video.title : item.kind === 'photo' ? item.photo.title : item.photos[0].title
+            const description = item.kind === 'video' ? item.video.description : item.kind === 'photo' ? item.photo.description : item.photos[0].description
+            const location = item.kind === 'photo' ? item.photo.location : item.kind === 'photo-group' ? item.photos[0].location : ''
             return (
               <motion.article
                 key={`${item.kind}-${item.id}`}
@@ -210,7 +306,7 @@ export function GalleryPage() {
                 className="border-beam group overflow-hidden rounded-2xl bg-panel"
               >
                 {item.kind === 'photo' ? (
-                  <button onClick={() => setLightbox(i)} className="block w-full" data-cursor="pointer">
+                  <button onClick={() => setLightbox(startIndex[i])} className="block w-full" data-cursor="pointer">
                     <img
                       src={item.photo.thumbnailUrl}
                       alt={title}
@@ -218,8 +314,10 @@ export function GalleryPage() {
                       className="max-h-[560px] w-full object-cover transition duration-700 group-hover:scale-[1.02]"
                     />
                   </button>
+                ) : item.kind === 'photo-group' ? (
+                  <PhotoGroupCarousel photos={item.photos} title={title} onOpen={(sub) => setLightbox(startIndex[i] + sub)} />
                 ) : (
-                  <button onClick={() => setLightbox(i)} className="relative block aspect-video w-full overflow-hidden" data-cursor="pointer">
+                  <button onClick={() => setLightbox(startIndex[i])} className="relative block aspect-video w-full overflow-hidden" data-cursor="pointer">
                     <img
                       src={item.video.thumbnailUrl}
                       alt={title}
@@ -243,8 +341,8 @@ export function GalleryPage() {
                   <div className="flex items-center gap-2 font-mono text-[11px] text-faint">
                     <span className="rounded-md bg-white/8 px-2 py-0.5 text-ink/70">{item.category}</span>
                     <span>· {timeAgo(item.date)}</span>
-                    {item.kind === 'photo' && item.photo.location && (
-                      <span className="flex items-center gap-1"><MapPin size={10} className="text-cyan" />{item.photo.location}</span>
+                    {location && (
+                      <span className="flex items-center gap-1"><MapPin size={10} className="text-cyan" />{location}</span>
                     )}
                   </div>
                   <h3 className="mt-2 font-display text-lg font-semibold leading-snug tracking-tight">{title}</h3>
@@ -287,7 +385,7 @@ export function GalleryPage() {
               className="absolute left-3 z-10 rounded-full bg-white/10 p-3 text-ink transition hover:bg-white/20 md:left-8"
               onClick={(e) => {
                 e.stopPropagation()
-                setLightbox((i) => (i === null ? null : (i - 1 + filtered.length) % filtered.length))
+                setLightbox((i) => (i === null ? null : (i - 1 + viewerItems.length) % viewerItems.length))
               }}
               aria-label="Previous"
             >
@@ -406,16 +504,51 @@ export function GalleryPage() {
                 ))}
               </div>
 
-              <label className="mb-3 flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-white/15 px-4 py-6 text-center font-mono text-xs text-muted transition hover:border-cyan/40 hover:text-cyan">
-                <Upload size={15} />
-                {uploadForm.file ? uploadForm.file.name : `choose a ${uploadForm.type}`}
-                <input
-                  type="file"
-                  accept={uploadForm.type === 'photo' ? 'image/*' : 'video/*'}
-                  className="hidden"
-                  onChange={(e) => setUploadForm((f) => ({ ...f, file: e.target.files?.[0] ?? null }))}
-                />
-              </label>
+              {uploadForm.files.length > 0 ? (
+                <div className="mb-3 flex flex-wrap gap-2 rounded-xl bg-white/5 p-2 ring-1 ring-white/10">
+                  {uploadForm.files.map((file, i) => (
+                    <div key={i} className="relative size-16 shrink-0 overflow-hidden rounded-lg bg-black/40">
+                      {uploadForm.type === 'photo' ? (
+                        <img src={previewUrls[i]} alt="" className="size-full object-cover" />
+                      ) : (
+                        <div className="grid size-full place-items-center px-1 text-center font-mono text-[9px] text-muted">{file.name}</div>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setUploadForm((f) => ({ ...f, files: f.files.filter((_, idx) => idx !== i) }))}
+                        className="absolute right-0.5 top-0.5 grid size-4 place-items-center rounded-full bg-black/70 text-ink"
+                        aria-label="Remove"
+                      >
+                        <X size={10} />
+                      </button>
+                    </div>
+                  ))}
+                  {uploadForm.type === 'photo' && (
+                    <label className="grid size-16 shrink-0 cursor-pointer place-items-center rounded-lg border border-dashed border-white/20 text-muted transition hover:border-cyan/40 hover:text-cyan">
+                      <Plus size={16} />
+                      <input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        className="hidden"
+                        onChange={(e) => setUploadForm((f) => ({ ...f, files: [...f.files, ...Array.from(e.target.files ?? [])] }))}
+                      />
+                    </label>
+                  )}
+                </div>
+              ) : (
+                <label className="mb-3 flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-white/15 px-4 py-6 text-center font-mono text-xs text-muted transition hover:border-cyan/40 hover:text-cyan">
+                  <Upload size={15} />
+                  {`choose ${uploadForm.type === 'photo' ? 'photo(s)' : 'a video'}`}
+                  <input
+                    type="file"
+                    accept={uploadForm.type === 'photo' ? 'image/*' : 'video/*'}
+                    multiple={uploadForm.type === 'photo'}
+                    className="hidden"
+                    onChange={(e) => setUploadForm((f) => ({ ...f, files: Array.from(e.target.files ?? []) }))}
+                  />
+                </label>
+              )}
 
               <input
                 value={uploadForm.title}
@@ -461,7 +594,7 @@ export function GalleryPage() {
 
               <button
                 onClick={submitUpload}
-                disabled={uploading || !uploadForm.file || !uploadForm.title.trim()}
+                disabled={uploading || uploadForm.files.length === 0 || !uploadForm.title.trim()}
                 className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan to-violet px-5 py-2.5 font-mono text-sm font-semibold text-void transition enabled:hover:shadow-[0_0_24px_-6px_#22d3ee] disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <Upload size={14} />

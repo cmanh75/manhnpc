@@ -129,6 +129,21 @@ export const api = {
     return assertJsonObject<Photo>(data, 'uploadPhoto')
   },
 
+  async uploadPhotos(files: File[], meta: { title: string; description?: string; category: string; location?: string }): Promise<Photo[]> {
+    const form = new FormData()
+    files.forEach((file) => form.append('files', file))
+    form.append('title', meta.title)
+    if (meta.description) form.append('description', meta.description)
+    form.append('category', meta.category)
+    if (meta.location) form.append('location', meta.location)
+    const { data } = await client.post('/media/photos/upload-batch', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 120_000,
+    })
+    if (!Array.isArray(data)) throw new Error('uploadPhotos: expected a JSON array')
+    return data as Photo[]
+  },
+
   async uploadVideo(file: File, meta: { title: string; description?: string; category: string; durationSeconds?: number }): Promise<Video> {
     const form = new FormData()
     form.append('file', file)

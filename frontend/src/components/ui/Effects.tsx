@@ -1,10 +1,12 @@
-import { useEffect, useRef, useState } from 'react'
-import { motion, useMotionValue, useSpring, useTransform } from 'framer-motion'
+import { useEffect, useRef } from 'react'
+import { motion, useMotionTemplate, useMotionValue, useSpring, useTransform } from 'framer-motion'
 import { clsx } from '../../lib/utils'
 
 /**
  * TiltCard — 3D perspective tilt that follows the cursor, plus a
  * spotlight glow that tracks the pointer across the card surface.
+ * Everything flows through motion values (no React state) so mousemove
+ * never triggers a re-render — same rationale as CustomCursor.
  */
 export function TiltCard({
   children,
@@ -20,7 +22,10 @@ export function TiltCard({
   const py = useMotionValue(0.5)
   const rx = useSpring(useTransform(py, [0, 1], [maxTilt, -maxTilt]), { stiffness: 220, damping: 22 })
   const ry = useSpring(useTransform(px, [0, 1], [-maxTilt, maxTilt]), { stiffness: 220, damping: 22 })
-  const [spot, setSpot] = useState({ x: 50, y: 50, on: false })
+  const spotOpacity = useSpring(0, { stiffness: 300, damping: 30 })
+  const spotX = useTransform(px, (v) => `${v * 100}%`)
+  const spotY = useTransform(py, (v) => `${v * 100}%`)
+  const spotBackground = useMotionTemplate`radial-gradient(420px circle at ${spotX} ${spotY}, rgba(34,211,238,0.10), transparent 65%)`
 
   return (
     <motion.div
@@ -29,28 +34,23 @@ export function TiltCard({
       onPointerMove={(e) => {
         const rect = ref.current?.getBoundingClientRect()
         if (!rect) return
-        const x = (e.clientX - rect.left) / rect.width
-        const y = (e.clientY - rect.top) / rect.height
-        px.set(x)
-        py.set(y)
-        setSpot({ x: x * 100, y: y * 100, on: true })
+        px.set((e.clientX - rect.left) / rect.width)
+        py.set((e.clientY - rect.top) / rect.height)
+        spotOpacity.set(1)
       }}
       onPointerLeave={() => {
         px.set(0.5)
         py.set(0.5)
-        setSpot((s) => ({ ...s, on: false }))
+        spotOpacity.set(0)
       }}
       className={clsx('relative', className)}
     >
       {children}
       {/* spotlight overlay */}
-      <div
+      <motion.div
         aria-hidden
-        className="pointer-events-none absolute inset-0 rounded-[inherit] transition-opacity duration-300"
-        style={{
-          opacity: spot.on ? 1 : 0,
-          background: `radial-gradient(420px circle at ${spot.x}% ${spot.y}%, rgba(34,211,238,0.10), transparent 65%)`,
-        }}
+        className="pointer-events-none absolute inset-0 rounded-[inherit]"
+        style={{ opacity: spotOpacity, background: spotBackground }}
       />
     </motion.div>
   )

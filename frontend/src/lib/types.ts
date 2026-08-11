@@ -49,6 +49,8 @@ export interface Photo {
   description: string
   url: string
   thumbnailUrl: string
+  groupId?: string | null
+  position?: number
   category: 'travel' | 'food' | 'code' | 'life'
   location: string
   takenAt: string

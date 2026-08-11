@@ -7,7 +7,7 @@ import { useAppStore } from '../../store/useAppStore'
 
 const links = [
   { to: '/', label: 'home', end: true },
-  { to: '/globe', label: 'globe' },
+  // globe tab temporarily hidden — route still works, just not promoted in nav
   { to: '/gallery', label: 'gallery' },
   { to: '/blog', label: 'blog' },
   { to: '/guestbook', label: 'guestbook' },

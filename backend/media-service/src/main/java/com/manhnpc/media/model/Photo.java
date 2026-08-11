@@ -40,6 +40,13 @@ public class Photo {
     /** R2 object key backing {@link #url}; null for seeded/external URLs. */
     private String storageKey;
 
+    /** Shared by every photo in the same multi-photo post; null for standalone photos. */
+    private String groupId;
+
+    /** Order within {@link #groupId}; 0 for standalone photos. */
+    @Builder.Default
+    private int position = 0;
+
     /** One of: travel, food, code, life. */
     private String category;
 
