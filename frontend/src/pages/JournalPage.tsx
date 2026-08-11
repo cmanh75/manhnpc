@@ -1,7 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import Markdown from 'react-markdown'
-import { Lock, Plus, Trash2, Save, X, Calendar, ArrowLeft } from 'lucide-react'
+import { Lock, Plus, Trash2, Save, X, Calendar, ArrowLeft, Bold, Italic, Heading2, List, Image as ImageIcon } from 'lucide-react'
 import { PageShell, SectionHeading, Reveal } from '../components/ui'
 import { journal, type JournalEntryInput } from '../lib/api'
 import type { JournalEntry } from '../lib/types'
@@ -16,6 +15,30 @@ function emptyDraft(): JournalEntryInput {
   return { title: '', content: '', tags: [], entryDate: today() }
 }
 
+/** Wrap the current selection (or insert a placeholder) with markdown syntax. */
+function wrapSelection(textarea: HTMLTextAreaElement, before: string, after: string, placeholder: string) {
+  const { selectionStart, selectionEnd, value } = textarea
+  const selected = value.slice(selectionStart, selectionEnd) || placeholder
+  const next = value.slice(0, selectionStart) + before + selected + after + value.slice(selectionEnd)
+  const cursor = selectionStart + before.length + selected.length + after.length
+  return { next, cursor }
+}
+
+/** Prefix the current line with markdown syntax (heading, list item, …). */
+function prefixLine(textarea: HTMLTextAreaElement, prefix: string) {
+  const { selectionStart, value } = textarea
+  const lineStart = value.lastIndexOf('\n', selectionStart - 1) + 1
+  const next = value.slice(0, lineStart) + prefix + value.slice(lineStart)
+  return { next, cursor: selectionStart + prefix.length }
+}
+
+/** Insert text at the cursor, replacing any selection. */
+function insertAtCursor(textarea: HTMLTextAreaElement, text: string) {
+  const { selectionStart, selectionEnd, value } = textarea
+  const next = value.slice(0, selectionStart) + text + value.slice(selectionEnd)
+  return { next, cursor: selectionStart + text.length }
+}
+
 export function JournalPage() {
   const owner = useAppStore((s) => s.owner)
   const [entries, setEntries] = useState<JournalEntry[]>([])
@@ -26,6 +49,35 @@ export function JournalPage() {
   const [draft, setDraft] = useState<JournalEntryInput>(emptyDraft())
   const [tagsInput, setTagsInput] = useState('')
   const [saving, setSaving] = useState(false)
+  const [uploadingImage, setUploadingImage] = useState(false)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  function applyEdit(fn: (ta: HTMLTextAreaElement) => { next: string; cursor: number }) {
+    const ta = textareaRef.current
+    if (!ta) return
+    const { next, cursor } = fn(ta)
+    setDraft((d) => ({ ...d, content: next }))
+    requestAnimationFrame(() => {
+      ta.focus()
+      ta.setSelectionRange(cursor, cursor)
+    })
+  }
+
+  async function uploadImages(files: FileList | File[]) {
+    const file = files[0]
+    if (!file) return
+    setUploadingImage(true)
+    setError(null)
+    try {
+      const url = await journal.uploadImage(file)
+      applyEdit((ta) => insertAtCursor(ta, `![${file.name}](${url})\n`))
+    } catch {
+      setError('could not upload image')
+    } finally {
+      setUploadingImage(false)
+    }
+  }
 
   useEffect(() => {
     if (!owner) return
@@ -140,17 +192,82 @@ export function JournalPage() {
           className="glass mb-6 w-full rounded-xl px-4 py-2.5 font-mono text-xs outline-none placeholder:text-faint focus:ring-1 focus:ring-cyan/50"
         />
 
-        <div className="grid gap-4 md:grid-cols-2">
-          <textarea
-            value={draft.content}
-            onChange={(e) => setDraft((d) => ({ ...d, content: e.target.value }))}
-            placeholder="# markdown goes here…"
-            className="glass min-h-[50svh] w-full resize-none rounded-2xl p-5 font-mono text-sm outline-none placeholder:text-faint focus:ring-1 focus:ring-cyan/50"
+        <div className="glass mb-2 flex flex-wrap items-center gap-1 rounded-xl p-1.5">
+          <button
+            type="button"
+            title="Bold"
+            onClick={() => applyEdit((ta) => wrapSelection(ta, '**', '**', 'bold text'))}
+            className="rounded-lg p-2 text-muted transition hover:bg-white/8 hover:text-ink"
+          >
+            <Bold size={15} />
+          </button>
+          <button
+            type="button"
+            title="Italic"
+            onClick={() => applyEdit((ta) => wrapSelection(ta, '_', '_', 'italic text'))}
+            className="rounded-lg p-2 text-muted transition hover:bg-white/8 hover:text-ink"
+          >
+            <Italic size={15} />
+          </button>
+          <button
+            type="button"
+            title="Heading"
+            onClick={() => applyEdit((ta) => prefixLine(ta, '## '))}
+            className="rounded-lg p-2 text-muted transition hover:bg-white/8 hover:text-ink"
+          >
+            <Heading2 size={15} />
+          </button>
+          <button
+            type="button"
+            title="List item"
+            onClick={() => applyEdit((ta) => prefixLine(ta, '- '))}
+            className="rounded-lg p-2 text-muted transition hover:bg-white/8 hover:text-ink"
+          >
+            <List size={15} />
+          </button>
+          <div className="mx-1 h-5 w-px bg-white/10" />
+          <button
+            type="button"
+            title="Insert image"
+            disabled={uploadingImage}
+            onClick={() => fileInputRef.current?.click()}
+            className="flex items-center gap-1.5 rounded-lg p-2 text-muted transition hover:bg-white/8 hover:text-ink disabled:opacity-40"
+          >
+            <ImageIcon size={15} />
+            {uploadingImage && <span className="font-mono text-[10px]">uploading…</span>}
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => {
+              if (e.target.files) uploadImages(e.target.files)
+              e.target.value = ''
+            }}
           />
-          <div className="prose-dev glass min-h-[50svh] overflow-y-auto rounded-2xl p-5 text-[14px]">
-            <Markdown>{draft.content || '_preview will render here_'}</Markdown>
-          </div>
         </div>
+
+        <textarea
+          ref={textareaRef}
+          value={draft.content}
+          onChange={(e) => setDraft((d) => ({ ...d, content: e.target.value }))}
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={(e) => {
+            e.preventDefault()
+            if (e.dataTransfer.files.length) uploadImages(e.dataTransfer.files)
+          }}
+          onPaste={(e) => {
+            const imageItem = Array.from(e.clipboardData.items).find((item) => item.type.startsWith('image/'))
+            const file = imageItem?.getAsFile()
+            if (file) {
+              e.preventDefault()
+              uploadImages([file])
+            }
+          }}
+          placeholder="# markdown goes here… (drag, paste or use the image button to add pictures)"
+          className="glass min-h-[55svh] w-full resize-none rounded-2xl p-5 font-mono text-sm outline-none placeholder:text-faint focus:ring-1 focus:ring-cyan/50"
+        />
 
         {error && <p className="mt-4 font-mono text-xs text-pink">{error}</p>}
 

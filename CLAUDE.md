@@ -48,7 +48,7 @@ Full stack one-liner from repo root: `.\start-all.ps1` (starts backend jars + Vi
 client → api-gateway :8090 (Spring Cloud Gateway, lb:// routes, CORS for :5173)
            ├── /api/auth/**, /api/profile → auth-service   :8081  (JWT HS256, BCrypt user)
            ├── /api/posts/**             → content-service :8082  (blog posts)
-           ├── /api/media/**             → media-service   :8083  (photos/videos + uploads → ./uploads)
+           ├── /api/media/**             → media-service   :8083  (photos/videos; uploads go straight to Cloudflare R2, gateway never proxies file bytes)
            ├── /api/travel/**            → travel-service  :8084  (visited places for the globe)
            └── /api/guestbook/**         → guestbook-service :8085 (visitor guestbook)
          discovery-server :8761 (Eureka)
@@ -57,6 +57,7 @@ client → api-gateway :8090 (Spring Cloud Gateway, lb:// routes, CORS for :5173
 - Every service: H2 in-memory DB, `ddl-auto: create`, seeded by a `CommandLineRunner` — data resets on every restart. Nothing is persistent except uploaded files.
 - Shared HS256 `jwt.secret` string duplicated across each service's `application.yml`. auth-service issues tokens; the other services validate writes via a lightweight `JwtWriteProtectionFilter` (OPTIONS/GET pass freely so CORS preflight works).
 - Owner credentials are supplied through environment variables. User table is `app_users` (`USER` is reserved in H2 2.x).
+- media-service uploads (`POST /api/media/photos/upload`, `/videos/upload`) stream straight to a Cloudflare R2 bucket via `R2StorageService` (AWS SDK v2 S3 client, endpoint override to `https://<account>.r2.cloudflarestorage.com`). `Photo`/`Video.url` stores the full public R2 URL and `storageKey` the R2 object key (used to delete the object on `DELETE /api/media/photos|videos/{id}`); seeded/demo rows have no `storageKey` since they point at external picsum/sample URLs. Needs `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, `R2_PUBLIC_BASE_URL` env vars — all default to empty locally so the service still boots without R2 configured (uploads just fail until set).
 - guestbook-service is the exception to the write-protection rule: POST is public (visitors sign without accounts); only DELETE/PUT/PATCH require the JWT. FE owner state lives in the zustand store (`owner`), session persisted under localStorage `manhnpc.auth`, attached to requests by an axios interceptor.
 - Consistent error shape everywhere via `@RestControllerAdvice`: `{timestamp, status, error, message, path}`.
 

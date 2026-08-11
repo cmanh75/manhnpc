@@ -29,7 +29,12 @@ public class JwtAllMethodsProtectionFilter extends OncePerRequestFilter {
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        return request.getRequestURI().startsWith("/h2-console");
+        // CORS preflight never carries the Authorization header — let it through
+        // so the browser's preflight check succeeds and the real request can be sent.
+        // (Uploaded images are served straight from R2's public URL, never through
+        // this service, so there's no GET-serving path here to exempt.)
+        return request.getRequestURI().startsWith("/h2-console")
+                || "OPTIONS".equalsIgnoreCase(request.getMethod());
     }
 
     @Override

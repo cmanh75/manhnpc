@@ -74,10 +74,13 @@ services:
       SPRING_DATASOURCE_URL: jdbc:h2:file:/app/data/mediadb
       SPRING_JPA_HIBERNATE_DDL_AUTO: update
       SPRING_H2_CONSOLE_ENABLED: "false"
-      MEDIA_UPLOAD_DIR: /app/uploads
+      R2_ACCOUNT_ID: ${R2_ACCOUNT_ID}
+      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY}
+      R2_BUCKET: ${R2_BUCKET}
+      R2_PUBLIC_BASE_URL: ${R2_PUBLIC_BASE_URL}
     volumes:
       - media_data:/app/data
-      - media_uploads:/app/uploads
     mem_limit: 384m
 
   travel-service:
@@ -130,6 +133,11 @@ services:
       SPRING_DATASOURCE_URL: jdbc:h2:file:/app/data/journaldb
       SPRING_JPA_HIBERNATE_DDL_AUTO: update
       SPRING_H2_CONSOLE_ENABLED: "false"
+      R2_ACCOUNT_ID: ${R2_ACCOUNT_ID}
+      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY}
+      R2_BUCKET: ${R2_BUCKET}
+      R2_PUBLIC_BASE_URL: ${R2_PUBLIC_BASE_URL}
     volumes:
       - journal_data:/app/data
     mem_limit: 320m
@@ -167,7 +175,6 @@ volumes:
   auth_data:
   content_data:
   media_data:
-  media_uploads:
   travel_data:
   guestbook_data:
   journal_data:

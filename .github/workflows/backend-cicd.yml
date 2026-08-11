@@ -40,6 +40,11 @@ jobs:
         env:
           JWT_SECRET: ci-placeholder-at-least-32-characters
           OWNER_PASSWORD: ci-placeholder
+          R2_ACCOUNT_ID: ci-placeholder
+          R2_ACCESS_KEY_ID: ci-placeholder
+          R2_SECRET_ACCESS_KEY: ci-placeholder
+          R2_BUCKET: ci-placeholder
+          R2_PUBLIC_BASE_URL: https://ci-placeholder.example.com
         run: docker compose -f docker-compose.prod.yml config --quiet
 
   deploy:
@@ -66,12 +71,17 @@ jobs:
         env:
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           OWNER_PASSWORD: ${{ secrets.OWNER_PASSWORD }}
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          R2_PUBLIC_BASE_URL: ${{ secrets.R2_PUBLIC_BASE_URL }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           password: ${{ secrets.VPS_PASSWORD }}
           port: ${{ secrets.VPS_PORT }}
-          envs: JWT_SECRET,OWNER_PASSWORD
+          envs: JWT_SECRET,OWNER_PASSWORD,R2_ACCOUNT_ID,R2_ACCESS_KEY_ID,R2_SECRET_ACCESS_KEY,R2_BUCKET,R2_PUBLIC_BASE_URL
           command_timeout: 20m
           script: |
             set -eu
@@ -86,6 +96,11 @@ jobs:
               printf 'OWNER_PASSWORD=%s\n' "$OWNER_PASSWORD"
               printf 'OWNER_USERNAME=manhnpc\n'
               printf 'OWNER_DISPLAY_NAME=Manh NPC\n'
+              printf 'R2_ACCOUNT_ID=%s\n' "$R2_ACCOUNT_ID"
+              printf 'R2_ACCESS_KEY_ID=%s\n' "$R2_ACCESS_KEY_ID"
+              printf 'R2_SECRET_ACCESS_KEY=%s\n' "$R2_SECRET_ACCESS_KEY"
+              printf 'R2_BUCKET=%s\n' "$R2_BUCKET"
+              printf 'R2_PUBLIC_BASE_URL=%s\n' "$R2_PUBLIC_BASE_URL"
             } > "$BACKEND/.env"
 
             docker network inspect english-supporter-backend_default >/dev/null
@@ -107,4 +122,4 @@ jobs:
 
             docker compose -f "$BACKEND/docker-compose.prod.yml" ps
 
-            unset JWT_SECRET OWNER_PASSWORD
+            unset JWT_SECRET OWNER_PASSWORD R2_ACCOUNT_ID R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY R2_BUCKET R2_PUBLIC_BASE_URL

@@ -37,6 +37,9 @@ public class Photo {
 
     private String thumbnailUrl;
 
+    /** R2 object key backing {@link #url}; null for seeded/external URLs. */
+    private String storageKey;
+
     /** One of: travel, food, code, life. */
     private String category;
 
