@@ -40,6 +40,10 @@ spring:
           uri: lb://guestbook-service
           predicates:
             - Path=/api/guestbook/**
+        - id: journal-service
+          uri: lb://journal-service
+          predicates:
+            - Path=/api/journal/**
 
 eureka:
   instance:

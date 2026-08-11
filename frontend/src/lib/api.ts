@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { VisitedPlace, TravelStats, Post, PagedPosts, Photo, Video, Profile, GuestbookEntry } from './types'
+import type { VisitedPlace, TravelStats, Post, PagedPosts, Photo, Video, Profile, GuestbookEntry, JournalEntry } from './types'
 import { mockPlaces, mockTravelStats, mockPosts, mockPhotos, mockVideos, mockProfile } from './mock'
 import { authSession, type OwnerSession } from './auth-session'
 export type { OwnerSession } from './auth-session'
@@ -131,6 +131,46 @@ export const auth = {
   },
   logout() {
     authSession.clear()
+  },
+}
+
+/* ---------- journal: private, owner-only, no offline fallback ---------- */
+
+function normalizeJournalEntry(raw: Omit<JournalEntry, 'tags'> & { tags?: string | string[] }): JournalEntry {
+  const tags: string[] = Array.isArray(raw.tags)
+    ? raw.tags
+    : typeof raw.tags === 'string'
+      ? raw.tags.split(',').map((t) => t.trim()).filter(Boolean)
+      : []
+  return { ...raw, tags }
+}
+
+export interface JournalEntryInput {
+  title: string
+  content: string
+  tags: string[]
+  entryDate: string
+}
+
+export const journal = {
+  async list(tag?: string): Promise<JournalEntry[]> {
+    const { data } = await client.get('/journal', { params: tag ? { tag } : undefined })
+    return (data as JournalEntry[]).map(normalizeJournalEntry)
+  },
+  async get(id: number): Promise<JournalEntry> {
+    const { data } = await client.get(`/journal/${id}`)
+    return normalizeJournalEntry(data)
+  },
+  async create(entry: JournalEntryInput): Promise<JournalEntry> {
+    const { data } = await client.post('/journal', { ...entry, tags: entry.tags.join(',') })
+    return normalizeJournalEntry(data)
+  },
+  async update(id: number, entry: JournalEntryInput): Promise<JournalEntry> {
+    const { data } = await client.put(`/journal/${id}`, { ...entry, tags: entry.tags.join(',') })
+    return normalizeJournalEntry(data)
+  },
+  async remove(id: number): Promise<void> {
+    await client.delete(`/journal/${id}`)
   },
 }
 

@@ -116,6 +116,24 @@ services:
       - guestbook_data:/app/data
     mem_limit: 320m
 
+  journal-service:
+    <<: *service
+    container_name: portfolio-journal
+    build:
+      <<: *build
+      args:
+        SERVICE: journal-service
+    depends_on:
+      - discovery-server
+    environment:
+      <<: *common-env
+      SPRING_DATASOURCE_URL: jdbc:h2:file:/app/data/journaldb
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_H2_CONSOLE_ENABLED: "false"
+    volumes:
+      - journal_data:/app/data
+    mem_limit: 320m
+
   api-gateway:
     <<: *service
     container_name: portfolio-api-gateway
@@ -130,6 +148,7 @@ services:
       - media-service
       - travel-service
       - guestbook-service
+      - journal-service
     environment:
       <<: *common-env
       CORS_ALLOWED_ORIGINS: https://manhnpc.com,https://www.manhnpc.com
@@ -151,3 +170,4 @@ volumes:
   media_uploads:
   travel_data:
   guestbook_data:
+  journal_data:

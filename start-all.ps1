@@ -22,7 +22,7 @@ Write-Host '=== manhnpc universe: igniting ===' -ForegroundColor Magenta
 Start-Jar 'discovery-server'
 Start-Sleep -Seconds 12
 
-'auth-service', 'content-service', 'media-service', 'travel-service', 'guestbook-service' | ForEach-Object { Start-Jar $_ }
+'auth-service', 'content-service', 'media-service', 'travel-service', 'guestbook-service', 'journal-service' | ForEach-Object { Start-Jar $_ }
 Start-Sleep -Seconds 20
 
 Start-Jar 'api-gateway'

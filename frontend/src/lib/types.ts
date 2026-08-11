@@ -92,3 +92,13 @@ export interface GuestbookEntry {
   emoji: string
   createdAt: string
 }
+
+export interface JournalEntry {
+  id: number
+  title: string
+  content: string
+  tags: string[]
+  entryDate: string
+  createdAt: string
+  updatedAt: string
+}

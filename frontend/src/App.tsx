@@ -16,6 +16,7 @@ const VideosPage = lazy(() => import('./pages/VideosPage').then((module) => ({ d
 const BlogPage = lazy(() => import('./pages/BlogPage').then((module) => ({ default: module.BlogPage })))
 const BlogPostPage = lazy(() => import('./pages/BlogPostPage').then((module) => ({ default: module.BlogPostPage })))
 const GuestbookPage = lazy(() => import('./pages/GuestbookPage').then((module) => ({ default: module.GuestbookPage })))
+const JournalPage = lazy(() => import('./pages/JournalPage').then((module) => ({ default: module.JournalPage })))
 const AboutPage = lazy(() => import('./pages/AboutPage').then((module) => ({ default: module.AboutPage })))
 const LoginPage = lazy(() => import('./pages/LoginPage').then((module) => ({ default: module.LoginPage })))
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage').then((module) => ({ default: module.NotFoundPage })))
@@ -61,6 +62,7 @@ function AnimatedRoutes() {
             <Route path="/blog" element={<BlogPage />} />
             <Route path="/blog/:slug" element={<BlogPostPage />} />
             <Route path="/guestbook" element={<GuestbookPage />} />
+            <Route path="/journal" element={<JournalPage />} />
             <Route path="/about" element={<AboutPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="*" element={<NotFoundPage />} />

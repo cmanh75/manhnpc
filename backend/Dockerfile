@@ -8,6 +8,7 @@ COPY content-service/pom.xml content-service/pom.xml
 COPY media-service/pom.xml media-service/pom.xml
 COPY travel-service/pom.xml travel-service/pom.xml
 COPY guestbook-service/pom.xml guestbook-service/pom.xml
+COPY journal-service/pom.xml journal-service/pom.xml
 RUN mvn -B -DskipTests dependency:go-offline
 COPY . .
 RUN mvn -B -DskipTests package

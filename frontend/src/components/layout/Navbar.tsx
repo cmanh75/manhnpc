@@ -20,6 +20,7 @@ export function Navbar() {
   const setPaletteOpen = useAppStore((s) => s.setPaletteOpen)
   const owner = useAppStore((s) => s.owner)
   const location = useLocation()
+  const navLinks = owner ? [...links, { to: '/journal', label: 'journal' }] : links
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 24)
@@ -51,7 +52,7 @@ export function Navbar() {
         </Link>
 
         <ul className="hidden items-center gap-1 md:flex">
-          {links.map((link) => (
+          {navLinks.map((link) => (
             <li key={link.to} className="relative">
               <NavLink
                 to={link.to}

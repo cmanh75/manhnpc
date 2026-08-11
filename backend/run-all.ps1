@@ -29,6 +29,8 @@ Start-Service "media-service"
 Start-Sleep -Seconds 3
 Start-Service "travel-service"
 Start-Service "guestbook-service"
+Start-Sleep -Seconds 3
+Start-Service "journal-service"
 Start-Sleep -Seconds 10
 
 # 3) Gateway last
