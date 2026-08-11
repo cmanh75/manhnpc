@@ -21,6 +21,20 @@ client.interceptors.request.use((config) => {
   return config
 })
 
+/**
+ * A same-origin `/api/*` call against a misconfigured deploy resolves (200 OK)
+ * to Firebase Hosting's SPA fallback `index.html` instead of throwing — so an
+ * unguarded write would silently accept an HTML string as if it were the
+ * real payload. Call this on any response that isn't itself wrapped in
+ * withFallback so a misconfiguration fails loudly instead of poisoning state.
+ */
+function assertJsonObject<T>(data: unknown, context: string): T {
+  if (typeof data !== 'object' || data === null) {
+    throw new Error(`${context}: expected a JSON object, got ${typeof data}`)
+  }
+  return data as T
+}
+
 /** The backend stores tags as a comma string — normalize to string[]. */
 function normalizePost(raw: Omit<Post, 'tags'> & { tags?: string | string[] }): Post {
   const tags: string[] = Array.isArray(raw.tags)
@@ -112,7 +126,7 @@ export const api = {
       headers: { 'Content-Type': 'multipart/form-data' },
       timeout: 60_000,
     })
-    return data as Photo
+    return assertJsonObject<Photo>(data, 'uploadPhoto')
   },
 
   async uploadVideo(file: File, meta: { title: string; description?: string; category: string; durationSeconds?: number }): Promise<Video> {
@@ -126,7 +140,7 @@ export const api = {
       headers: { 'Content-Type': 'multipart/form-data' },
       timeout: 180_000,
     })
-    return data as Video
+    return assertJsonObject<Video>(data, 'uploadVideo')
   },
 
   async deletePhoto(id: number): Promise<void> {
@@ -163,7 +177,9 @@ export const auth = {
   async login(username: string, password: string): Promise<OwnerSession> {
     // deliberate direct call, no fallback — login is meaningless offline
     const { data } = await client.post('/auth/login', { username, password })
-    const session: OwnerSession = { token: data.token, user: data.user }
+    const body = assertJsonObject<{ token?: string; user?: OwnerSession['user'] }>(data, 'login')
+    if (!body.token || !body.user) throw new Error('login: malformed response')
+    const session: OwnerSession = { token: body.token, user: body.user }
     authSession.save(session)
     return session
   },
