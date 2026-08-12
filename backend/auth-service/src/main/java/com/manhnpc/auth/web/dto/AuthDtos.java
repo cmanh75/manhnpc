@@ -12,6 +12,9 @@ public final class AuthDtos {
     public record LoginRequest(String username, String password) {
     }
 
+    public record ChangePasswordRequest(String currentPassword, String newPassword) {
+    }
+
     public record UserDto(Long id, String username, String displayName, String avatarUrl) {
 
         public static UserDto from(User user) {

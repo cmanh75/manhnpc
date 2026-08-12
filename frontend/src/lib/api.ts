@@ -231,6 +231,10 @@ export const auth = {
   logout() {
     authSession.clear()
   },
+  async changePassword(currentPassword: string, newPassword: string): Promise<void> {
+    // deliberate direct call, no fallback — a password change is meaningless offline
+    await client.put('/auth/password', { currentPassword, newPassword })
+  },
 }
 
 /* ---------- journal: private, owner-only, no offline fallback ---------- */
