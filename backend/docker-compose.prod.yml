@@ -4,6 +4,7 @@ x-service: &service
     EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka
     EUREKA_INSTANCE_PREFER_IP_ADDRESS: "true"
     JWT_SECRET: ${JWT_SECRET}
+    CORS_ALLOWED_ORIGINS: https://manhnpc.com,https://www.manhnpc.com
   networks:
     - portfolio
 
@@ -159,7 +160,6 @@ services:
       - journal-service
     environment:
       <<: *common-env
-      CORS_ALLOWED_ORIGINS: https://manhnpc.com,https://www.manhnpc.com
     networks:
       - portfolio
       - english_proxy

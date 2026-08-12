@@ -33,6 +33,9 @@ eureka:
 jwt:
   secret: ${JWT_SECRET}
 
+cors:
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}
+
 r2:
   account-id: ${R2_ACCOUNT_ID:}
   access-key-id: ${R2_ACCESS_KEY_ID:}
