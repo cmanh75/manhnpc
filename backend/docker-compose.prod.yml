@@ -143,6 +143,24 @@ services:
       - journal_data:/app/data
     mem_limit: 320m
 
+  audit-service:
+    <<: *service
+    container_name: portfolio-audit
+    build:
+      <<: *build
+      args:
+        SERVICE: audit-service
+    depends_on:
+      - discovery-server
+    environment:
+      <<: *common-env
+      SPRING_DATASOURCE_URL: jdbc:h2:file:/app/data/auditdb
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_H2_CONSOLE_ENABLED: "false"
+    volumes:
+      - audit_data:/app/data
+    mem_limit: 320m
+
   api-gateway:
     <<: *service
     container_name: portfolio-api-gateway
@@ -158,6 +176,7 @@ services:
       - travel-service
       - guestbook-service
       - journal-service
+      - audit-service
     environment:
       <<: *common-env
     networks:
@@ -178,3 +197,4 @@ volumes:
   travel_data:
   guestbook_data:
   journal_data:
+  audit_data:

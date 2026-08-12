@@ -19,7 +19,7 @@ export function Navbar() {
   const setPaletteOpen = useAppStore((s) => s.setPaletteOpen)
   const owner = useAppStore((s) => s.owner)
   const location = useLocation()
-  const navLinks = owner ? [...links, { to: '/journal', label: 'journal' }] : links
+  const navLinks = owner ? [...links, { to: '/journal', label: 'journal' }, { to: '/audit', label: 'audit' }] : links
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 24)

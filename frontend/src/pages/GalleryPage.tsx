@@ -134,6 +134,7 @@ export function GalleryPage() {
   const [showUpload, setShowUpload] = useState(false)
   const [uploadForm, setUploadForm] = useState(emptyUploadForm())
   const [uploading, setUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
 
@@ -183,23 +184,32 @@ export function GalleryPage() {
   async function submitUpload() {
     if (uploadForm.files.length === 0 || !uploadForm.title.trim()) return
     setUploading(true)
+    setUploadProgress(0)
     setUploadError(null)
     try {
       if (uploadForm.type === 'photo') {
-        const uploaded = await api.uploadPhotos(uploadForm.files, {
-          title: uploadForm.title.trim(),
-          description: uploadForm.description.trim() || undefined,
-          category: uploadForm.category,
-          location: uploadForm.location.trim() || undefined,
-        })
+        const uploaded = await api.uploadPhotos(
+          uploadForm.files,
+          {
+            title: uploadForm.title.trim(),
+            description: uploadForm.description.trim() || undefined,
+            category: uploadForm.category,
+            location: uploadForm.location.trim() || undefined,
+          },
+          setUploadProgress,
+        )
         setPhotos((prev) => [...uploaded, ...prev])
       } else {
-        const video = await api.uploadVideo(uploadForm.files[0], {
-          title: uploadForm.title.trim(),
-          description: uploadForm.description.trim() || undefined,
-          category: uploadForm.category,
-          durationSeconds: uploadForm.durationSeconds ? Number(uploadForm.durationSeconds) : undefined,
-        })
+        const video = await api.uploadVideo(
+          uploadForm.files[0],
+          {
+            title: uploadForm.title.trim(),
+            description: uploadForm.description.trim() || undefined,
+            category: uploadForm.category,
+            durationSeconds: uploadForm.durationSeconds ? Number(uploadForm.durationSeconds) : undefined,
+          },
+          setUploadProgress,
+        )
         setVideos((prev) => [video, ...prev])
       }
       setShowUpload(false)
@@ -595,10 +605,18 @@ export function GalleryPage() {
               <button
                 onClick={submitUpload}
                 disabled={uploading || uploadForm.files.length === 0 || !uploadForm.title.trim()}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan to-violet px-5 py-2.5 font-mono text-sm font-semibold text-void transition enabled:hover:shadow-[0_0_24px_-6px_#22d3ee] disabled:cursor-not-allowed disabled:opacity-40"
+                className="relative inline-flex w-full items-center justify-center gap-2 overflow-hidden rounded-xl bg-gradient-to-r from-cyan to-violet px-5 py-2.5 font-mono text-sm font-semibold text-void transition enabled:hover:shadow-[0_0_24px_-6px_#22d3ee] disabled:cursor-not-allowed disabled:opacity-40"
               >
-                <Upload size={14} />
-                {uploading ? 'uploading…' : 'post'}
+                {uploading && (
+                  <span
+                    className="absolute inset-y-0 left-0 bg-white/25 transition-[width] duration-200"
+                    style={{ width: `${uploadProgress}%` }}
+                  />
+                )}
+                <span className="relative flex items-center gap-2">
+                  <Upload size={14} />
+                  {uploading ? (uploadProgress >= 100 ? 'processing…' : `uploading… ${uploadProgress}%`) : 'post'}
+                </span>
               </button>
             </motion.div>
           </motion.div>

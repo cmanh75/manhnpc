@@ -104,3 +104,39 @@ export interface JournalEntry {
   createdAt: string
   updatedAt: string
 }
+
+export interface VisitLog {
+  id: number
+  ipAddress: string
+  userAgent: string
+  browser: string
+  os: string
+  path: string
+  referrer: string | null
+  language: string | null
+  createdAt: string
+}
+
+export interface PagedVisits {
+  content: VisitLog[]
+  totalElements: number
+  totalPages: number
+  number: number
+}
+
+export interface CountEntry {
+  label: string
+  count: number
+}
+
+export interface VisitStats {
+  totalVisits: number
+  uniqueIps: number
+  visitsToday: number
+  visitsLast30Days: number
+  topPaths: CountEntry[]
+  topReferrers: CountEntry[]
+  browsers: CountEntry[]
+  operatingSystems: CountEntry[]
+  visitsByDay: CountEntry[]
+}

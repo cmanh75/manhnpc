@@ -27,6 +27,7 @@
         <module>travel-service</module>
         <module>guestbook-service</module>
         <module>journal-service</module>
+        <module>audit-service</module>
     </modules>
 
     <properties>

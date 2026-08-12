@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { AnimatePresence } from 'framer-motion'
+import { audit } from './lib/api'
 import { Navbar } from './components/layout/Navbar'
 import { SmoothScroll } from './components/layout/SmoothScroll'
 import { Footer } from './components/layout/Footer'
@@ -16,6 +17,7 @@ const BlogPage = lazy(() => import('./pages/BlogPage').then((module) => ({ defau
 const BlogPostPage = lazy(() => import('./pages/BlogPostPage').then((module) => ({ default: module.BlogPostPage })))
 const GuestbookPage = lazy(() => import('./pages/GuestbookPage').then((module) => ({ default: module.GuestbookPage })))
 const JournalPage = lazy(() => import('./pages/JournalPage').then((module) => ({ default: module.JournalPage })))
+const AuditPage = lazy(() => import('./pages/AuditPage').then((module) => ({ default: module.AuditPage })))
 const AboutPage = lazy(() => import('./pages/AboutPage').then((module) => ({ default: module.AboutPage })))
 const LoginPage = lazy(() => import('./pages/LoginPage').then((module) => ({ default: module.LoginPage })))
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage').then((module) => ({ default: module.NotFoundPage })))
@@ -41,6 +43,7 @@ function ScrollToTop() {
   const { pathname } = useLocation()
   useEffect(() => {
     window.scrollTo({ top: 0 })
+    audit.recordVisit(pathname, document.referrer)
   }, [pathname])
   return null
 }
@@ -62,6 +65,7 @@ function AnimatedRoutes() {
             <Route path="/blog/:slug" element={<BlogPostPage />} />
             <Route path="/guestbook" element={<GuestbookPage />} />
             <Route path="/journal" element={<JournalPage />} />
+            <Route path="/audit" element={<AuditPage />} />
             <Route path="/about" element={<AboutPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="*" element={<NotFoundPage />} />

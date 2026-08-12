@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { VisitedPlace, TravelStats, Post, PagedPosts, Photo, Video, Profile, GuestbookEntry, JournalEntry } from './types'
+import type { VisitedPlace, TravelStats, Post, PagedPosts, Photo, Video, Profile, GuestbookEntry, JournalEntry, PagedVisits, VisitStats } from './types'
 import { mockPlaces, mockTravelStats, mockPosts, mockPhotos, mockVideos, mockProfile } from './mock'
 import { authSession, type OwnerSession } from './auth-session'
 export type { OwnerSession } from './auth-session'
@@ -115,7 +115,11 @@ export const api = {
 
   /* ---------- media uploads: owner-only, no offline fallback ---------- */
 
-  async uploadPhoto(file: File, meta: { title: string; description?: string; category: string; location?: string }): Promise<Photo> {
+  async uploadPhoto(
+    file: File,
+    meta: { title: string; description?: string; category: string; location?: string },
+    onProgress?: (percent: number) => void,
+  ): Promise<Photo> {
     const form = new FormData()
     form.append('file', file)
     form.append('title', meta.title)
@@ -125,11 +129,16 @@ export const api = {
     const { data } = await client.post('/media/photos/upload', form, {
       headers: { 'Content-Type': 'multipart/form-data' },
       timeout: 60_000,
+      onUploadProgress: onProgress && ((e) => onProgress(e.total ? Math.round((e.loaded / e.total) * 100) : 0)),
     })
     return assertJsonObject<Photo>(data, 'uploadPhoto')
   },
 
-  async uploadPhotos(files: File[], meta: { title: string; description?: string; category: string; location?: string }): Promise<Photo[]> {
+  async uploadPhotos(
+    files: File[],
+    meta: { title: string; description?: string; category: string; location?: string },
+    onProgress?: (percent: number) => void,
+  ): Promise<Photo[]> {
     const form = new FormData()
     files.forEach((file) => form.append('files', file))
     form.append('title', meta.title)
@@ -139,12 +148,17 @@ export const api = {
     const { data } = await client.post('/media/photos/upload-batch', form, {
       headers: { 'Content-Type': 'multipart/form-data' },
       timeout: 120_000,
+      onUploadProgress: onProgress && ((e) => onProgress(e.total ? Math.round((e.loaded / e.total) * 100) : 0)),
     })
     if (!Array.isArray(data)) throw new Error('uploadPhotos: expected a JSON array')
     return data as Photo[]
   },
 
-  async uploadVideo(file: File, meta: { title: string; description?: string; category: string; durationSeconds?: number }): Promise<Video> {
+  async uploadVideo(
+    file: File,
+    meta: { title: string; description?: string; category: string; durationSeconds?: number },
+    onProgress?: (percent: number) => void,
+  ): Promise<Video> {
     const form = new FormData()
     form.append('file', file)
     form.append('title', meta.title)
@@ -154,6 +168,7 @@ export const api = {
     const { data } = await client.post('/media/videos/upload', form, {
       headers: { 'Content-Type': 'multipart/form-data' },
       timeout: 180_000,
+      onUploadProgress: onProgress && ((e) => onProgress(e.total ? Math.round((e.loaded / e.total) * 100) : 0)),
     })
     return assertJsonObject<Video>(data, 'uploadVideo')
   },
@@ -246,6 +261,25 @@ export const journal = {
     form.append('file', file)
     const { data } = await client.post('/journal/images', form, { headers: { 'Content-Type': 'multipart/form-data' } })
     return data.url as string
+  },
+}
+
+/* ---------- audit: standard access-log data (IP, UA, path, referrer) — owner-only reads ---------- */
+
+export const audit = {
+  /** Fire-and-forget page-view beacon; failures are silently ignored. */
+  recordVisit(path: string, referrer: string) {
+    client
+      .post('/audit/visit', { path, referrer, language: navigator.language })
+      .catch(() => {})
+  },
+  async list(page = 0, size = 50): Promise<PagedVisits> {
+    const { data } = await client.get('/audit/visits', { params: { page, size } })
+    return assertJsonObject<PagedVisits>(data, 'audit.list')
+  },
+  async stats(): Promise<VisitStats> {
+    const { data } = await client.get('/audit/stats')
+    return assertJsonObject<VisitStats>(data, 'audit.stats')
   },
 }
 
