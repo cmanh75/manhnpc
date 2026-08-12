@@ -1,10 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Lock, Plus, Trash2, Save, X, Calendar, ArrowLeft, Bold, Italic, Heading2, List, Image as ImageIcon } from 'lucide-react'
+import Markdown from 'react-markdown'
+import remarkMath from 'remark-math'
+import rehypeKatex from 'rehype-katex'
+import 'katex/dist/katex.min.css'
+import { Lock, Plus, Trash2, Save, X, Calendar, ArrowLeft, Bold, Italic, Heading2, List, Image as ImageIcon, Sigma, Eye, Pencil } from 'lucide-react'
 import { PageShell, SectionHeading, Reveal } from '../components/ui'
 import { journal, type JournalEntryInput } from '../lib/api'
 import type { JournalEntry } from '../lib/types'
-import { formatDate } from '../lib/utils'
+import { formatDate, clsx } from '../lib/utils'
 import { useAppStore } from '../store/useAppStore'
 
 function today(): string {
@@ -50,6 +54,7 @@ export function JournalPage() {
   const [tagsInput, setTagsInput] = useState('')
   const [saving, setSaving] = useState(false)
   const [uploadingImage, setUploadingImage] = useState(false)
+  const [showPreview, setShowPreview] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -114,6 +119,7 @@ export function JournalPage() {
     setEditing(null)
     setDraft(emptyDraft())
     setTagsInput('')
+    setShowPreview(false)
     setView('editor')
   }
 
@@ -121,6 +127,7 @@ export function JournalPage() {
     setEditing(entry)
     setDraft({ title: entry.title, content: entry.content, tags: entry.tags, entryDate: entry.entryDate })
     setTagsInput(entry.tags.join(', '))
+    setShowPreview(false)
     setView('editor')
   }
 
@@ -196,40 +203,63 @@ export function JournalPage() {
           <button
             type="button"
             title="Bold"
+            disabled={showPreview}
             onClick={() => applyEdit((ta) => wrapSelection(ta, '**', '**', 'bold text'))}
-            className="rounded-lg p-2 text-muted transition hover:bg-white/8 hover:text-ink"
+            className="rounded-lg p-2 text-muted transition hover:bg-white/8 hover:text-ink disabled:opacity-40"
           >
             <Bold size={15} />
           </button>
           <button
             type="button"
             title="Italic"
+            disabled={showPreview}
             onClick={() => applyEdit((ta) => wrapSelection(ta, '_', '_', 'italic text'))}
-            className="rounded-lg p-2 text-muted transition hover:bg-white/8 hover:text-ink"
+            className="rounded-lg p-2 text-muted transition hover:bg-white/8 hover:text-ink disabled:opacity-40"
           >
             <Italic size={15} />
           </button>
           <button
             type="button"
             title="Heading"
+            disabled={showPreview}
             onClick={() => applyEdit((ta) => prefixLine(ta, '## '))}
-            className="rounded-lg p-2 text-muted transition hover:bg-white/8 hover:text-ink"
+            className="rounded-lg p-2 text-muted transition hover:bg-white/8 hover:text-ink disabled:opacity-40"
           >
             <Heading2 size={15} />
           </button>
           <button
             type="button"
             title="List item"
+            disabled={showPreview}
             onClick={() => applyEdit((ta) => prefixLine(ta, '- '))}
-            className="rounded-lg p-2 text-muted transition hover:bg-white/8 hover:text-ink"
+            className="rounded-lg p-2 text-muted transition hover:bg-white/8 hover:text-ink disabled:opacity-40"
           >
             <List size={15} />
           </button>
           <div className="mx-1 h-5 w-px bg-white/10" />
           <button
             type="button"
+            title="Inline math ($…$)"
+            disabled={showPreview}
+            onClick={() => applyEdit((ta) => wrapSelection(ta, '$', '$', 'x^2 + y^2 = z^2'))}
+            className="rounded-lg p-2 text-muted transition hover:bg-white/8 hover:text-ink disabled:opacity-40"
+          >
+            <Sigma size={15} />
+          </button>
+          <button
+            type="button"
+            title="Block math ($$…$$)"
+            disabled={showPreview}
+            onClick={() => applyEdit((ta) => wrapSelection(ta, '\n$$\n', '\n$$\n', '\\int_a^b f(x)\\,dx'))}
+            className="rounded-lg px-2 py-2 font-mono text-[11px] text-muted transition hover:bg-white/8 hover:text-ink disabled:opacity-40"
+          >
+            $$
+          </button>
+          <div className="mx-1 h-5 w-px bg-white/10" />
+          <button
+            type="button"
             title="Insert image"
-            disabled={uploadingImage}
+            disabled={uploadingImage || showPreview}
             onClick={() => fileInputRef.current?.click()}
             className="flex items-center gap-1.5 rounded-lg p-2 text-muted transition hover:bg-white/8 hover:text-ink disabled:opacity-40"
           >
@@ -246,28 +276,52 @@ export function JournalPage() {
               e.target.value = ''
             }}
           />
+          <button
+            type="button"
+            title={showPreview ? 'Back to editing' : 'Preview rendered markdown + LaTeX'}
+            onClick={() => setShowPreview((v) => !v)}
+            className={clsx(
+              'ml-auto flex items-center gap-1.5 rounded-lg px-2.5 py-2 font-mono text-[11px] transition',
+              showPreview ? 'bg-cyan/15 text-cyan' : 'text-muted hover:bg-white/8 hover:text-ink',
+            )}
+          >
+            {showPreview ? <Pencil size={13} /> : <Eye size={13} />}
+            {showPreview ? 'write' : 'preview'}
+          </button>
         </div>
 
-        <textarea
-          ref={textareaRef}
-          value={draft.content}
-          onChange={(e) => setDraft((d) => ({ ...d, content: e.target.value }))}
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={(e) => {
-            e.preventDefault()
-            if (e.dataTransfer.files.length) uploadImages(e.dataTransfer.files)
-          }}
-          onPaste={(e) => {
-            const imageItem = Array.from(e.clipboardData.items).find((item) => item.type.startsWith('image/'))
-            const file = imageItem?.getAsFile()
-            if (file) {
+        {showPreview ? (
+          <div className="prose-dev glass min-h-[55svh] w-full overflow-y-auto rounded-2xl p-5 text-[15px]">
+            {draft.content.trim() ? (
+              <Markdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
+                {draft.content}
+              </Markdown>
+            ) : (
+              <p className="font-mono text-sm text-faint">nothing to preview yet</p>
+            )}
+          </div>
+        ) : (
+          <textarea
+            ref={textareaRef}
+            value={draft.content}
+            onChange={(e) => setDraft((d) => ({ ...d, content: e.target.value }))}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => {
               e.preventDefault()
-              uploadImages([file])
-            }
-          }}
-          placeholder="# markdown goes here… (drag, paste or use the image button to add pictures)"
-          className="glass min-h-[55svh] w-full resize-none rounded-2xl p-5 font-mono text-sm outline-none placeholder:text-faint focus:ring-1 focus:ring-cyan/50"
-        />
+              if (e.dataTransfer.files.length) uploadImages(e.dataTransfer.files)
+            }}
+            onPaste={(e) => {
+              const imageItem = Array.from(e.clipboardData.items).find((item) => item.type.startsWith('image/'))
+              const file = imageItem?.getAsFile()
+              if (file) {
+                e.preventDefault()
+                uploadImages([file])
+              }
+            }}
+            placeholder="# markdown goes here… ($inline$ or $$block$$ LaTeX math, drag/paste images)"
+            className="glass min-h-[55svh] w-full resize-none rounded-2xl p-5 font-mono text-sm outline-none placeholder:text-faint focus:ring-1 focus:ring-cyan/50"
+          />
+        )}
 
         {error && <p className="mt-4 font-mono text-xs text-pink">{error}</p>}
 

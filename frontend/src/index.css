@@ -247,3 +247,6 @@ body {
 }
 .prose-dev img { @apply rounded-xl my-6; }
 .prose-dev hr { @apply border-white/10 my-8; }
+.prose-dev .katex-display {
+  @apply my-6 overflow-x-auto overflow-y-hidden py-1;
+}
