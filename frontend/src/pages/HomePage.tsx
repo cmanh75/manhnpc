@@ -65,6 +65,15 @@ export function HomePage() {
   const [photos, setPhotos] = useState<Photo[]>([])
   const [profile, setProfile] = useState<Profile>(initialProfile)
   const [showGlobe, setShowGlobe] = useState(false)
+  // the WebGL globe runs a continuous render loop — skip it on mobile, where it's a big source of jank
+  const [mobile, setMobile] = useState(() => window.matchMedia('(max-width: 767px)').matches)
+
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 767px)')
+    const update = () => setMobile(media.matches)
+    media.addEventListener('change', update)
+    return () => media.removeEventListener('change', update)
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -116,11 +125,16 @@ export function HomePage() {
           className="absolute inset-0 md:left-1/4"
         >
           <motion.div style={{ y: globeY, scale: globeScale, opacity: heroOpacity }} className="size-full">
-            {showGlobe && (
+            {showGlobe && (mobile ? (
+              <div
+                className="size-full"
+                style={{ background: 'radial-gradient(circle at 60% 45%, rgba(34,211,238,0.18), transparent 60%)' }}
+              />
+            ) : (
               <Suspense fallback={null}>
                 <GlobeScene places={places} ambient className="size-full" />
               </Suspense>
-            )}
+            ))}
           </motion.div>
         </motion.div>
         {/* readability gradient over the left column */}

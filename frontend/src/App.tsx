@@ -2,6 +2,8 @@ import { lazy, Suspense, useEffect, useState } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { AnimatePresence } from 'framer-motion'
 import { audit } from './lib/api'
+import { authSession } from './lib/auth-session'
+import { useAppStore } from './store/useAppStore'
 import { Navbar } from './components/layout/Navbar'
 import { SmoothScroll } from './components/layout/SmoothScroll'
 import { Footer } from './components/layout/Footer'
@@ -39,6 +41,24 @@ function DeferredEnhancements() {
   )
 }
 
+/** Logs the owner out as soon as the JWT expires, even if the tab is left open and never hits a 401. */
+function useSessionExpiryWatcher() {
+  const owner = useAppStore((s) => s.owner)
+  const setOwner = useAppStore((s) => s.setOwner)
+
+  useEffect(() => {
+    if (!owner) return
+    const check = () => {
+      if (authSession.isExpired()) {
+        authSession.clear()
+        setOwner(null)
+      }
+    }
+    const interval = window.setInterval(check, 60_000)
+    return () => window.clearInterval(interval)
+  }, [owner, setOwner])
+}
+
 function ScrollToTop() {
   const { pathname } = useLocation()
   useEffect(() => {
@@ -54,7 +74,7 @@ function AnimatedRoutes() {
 
   return (
     <>
-      <AnimatePresence mode="wait">
+      <AnimatePresence mode="popLayout">
         <Suspense fallback={<div className="min-h-svh" />}>
           <Routes location={location} key={location.pathname}>
             <Route path="/" element={<HomePage />} />
@@ -79,6 +99,7 @@ function AnimatedRoutes() {
 }
 
 export default function App() {
+  useSessionExpiryWatcher()
   return (
     <BrowserRouter>
       <ScrollToTop />

@@ -75,6 +75,90 @@ function emptyUploadForm() {
   }
 }
 
+/** True once (per mount) if the device has a real pointer that can hover — desktop mice, not touchscreens. */
+function useHoverCapable() {
+  const [hoverCapable] = useState(() => typeof window !== 'undefined' && window.matchMedia('(hover: hover)').matches)
+  return hoverCapable
+}
+
+/**
+ * Video feed card: shows the thumbnail by default. On hover-capable devices it autoplays muted
+ * inline when the pointer enters; on touch devices (no hover) it autoplays when scrolled to the
+ * center of the viewport instead, via IntersectionObserver.
+ */
+function VideoTile({ video, title, onOpen }: { video: Video; title: string; onOpen: () => void }) {
+  const containerRef = useRef<HTMLButtonElement>(null)
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const [playing, setPlaying] = useState(false)
+  const hoverCapable = useHoverCapable()
+
+  useEffect(() => {
+    if (playing) {
+      videoRef.current?.play().catch(() => {})
+    } else if (videoRef.current) {
+      videoRef.current.pause()
+      videoRef.current.currentTime = 0
+    }
+  }, [playing])
+
+  useEffect(() => {
+    if (hoverCapable) return
+    const el = containerRef.current
+    if (!el) return
+    const observer = new IntersectionObserver(([entry]) => setPlaying(entry.isIntersecting), {
+      rootMargin: '-45% 0px -45% 0px',
+      threshold: 0,
+    })
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [hoverCapable])
+
+  return (
+    <button
+      ref={containerRef}
+      onClick={onOpen}
+      onMouseEnter={hoverCapable ? () => setPlaying(true) : undefined}
+      onMouseLeave={hoverCapable ? () => setPlaying(false) : undefined}
+      className="relative block aspect-video w-full overflow-hidden"
+      data-cursor="pointer"
+    >
+      <img
+        src={video.thumbnailUrl}
+        alt={title}
+        loading="lazy"
+        className={clsx(
+          'size-full object-cover transition duration-700 group-hover:scale-[1.02]',
+          playing && 'opacity-0',
+        )}
+      />
+      <video
+        ref={videoRef}
+        src={video.url}
+        muted
+        loop
+        playsInline
+        preload="none"
+        className={clsx(
+          'absolute inset-0 size-full object-cover transition-opacity duration-300',
+          playing ? 'opacity-100' : 'opacity-0',
+        )}
+      />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
+      {!playing && (
+        <div className="absolute inset-0 grid place-items-center">
+          <span className="grid size-14 place-items-center rounded-full bg-black/45 ring-1 ring-white/25 backdrop-blur transition duration-300 group-hover:scale-110 group-hover:bg-cyan/25 group-hover:ring-cyan/60">
+            <Play size={20} className="ml-1 text-ink transition group-hover:text-cyan" fill="currentColor" />
+          </span>
+        </div>
+      )}
+      <span className="absolute bottom-3 right-3 flex items-center gap-1.5 rounded-md bg-black/60 px-2 py-1 font-mono text-[11px] text-ink backdrop-blur">
+        <Clock size={10} />
+        {formatDuration(video.durationSeconds)}
+      </span>
+    </button>
+  )
+}
+
 /** Instagram-style swipeable carousel embedded in a feed card, with dot indicators. */
 function PhotoGroupCarousel({ photos, title, onOpen }: { photos: Photo[]; title: string; onOpen: (index: number) => void }) {
   const [active, setActive] = useState(0)
@@ -327,24 +411,7 @@ export function GalleryPage() {
                 ) : item.kind === 'photo-group' ? (
                   <PhotoGroupCarousel photos={item.photos} title={title} onOpen={(sub) => setLightbox(startIndex[i] + sub)} />
                 ) : (
-                  <button onClick={() => setLightbox(startIndex[i])} className="relative block aspect-video w-full overflow-hidden" data-cursor="pointer">
-                    <img
-                      src={item.video.thumbnailUrl}
-                      alt={title}
-                      loading="lazy"
-                      className="size-full object-cover transition duration-700 group-hover:scale-[1.02]"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
-                    <div className="absolute inset-0 grid place-items-center">
-                      <span className="grid size-14 place-items-center rounded-full bg-black/45 ring-1 ring-white/25 backdrop-blur transition duration-300 group-hover:scale-110 group-hover:bg-cyan/25 group-hover:ring-cyan/60">
-                        <Play size={20} className="ml-1 text-ink transition group-hover:text-cyan" fill="currentColor" />
-                      </span>
-                    </div>
-                    <span className="absolute bottom-3 right-3 flex items-center gap-1.5 rounded-md bg-black/60 px-2 py-1 font-mono text-[11px] text-ink backdrop-blur">
-                      <Clock size={10} />
-                      {formatDuration(item.video.durationSeconds)}
-                    </span>
-                  </button>
+                  <VideoTile video={item.video} title={title} onOpen={() => setLightbox(startIndex[i])} />
                 )}
 
                 <div className="p-5">

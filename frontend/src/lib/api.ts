@@ -2,6 +2,7 @@ import axios from 'axios'
 import type { VisitedPlace, TravelStats, Post, PagedPosts, Photo, Video, Profile, GuestbookEntry, JournalEntry, PagedVisits, VisitStats } from './types'
 import { mockPlaces, mockTravelStats, mockPosts, mockPhotos, mockVideos, mockProfile } from './mock'
 import { authSession, type OwnerSession } from './auth-session'
+import { useAppStore } from '../store/useAppStore'
 export type { OwnerSession } from './auth-session'
 
 /**
@@ -20,6 +21,18 @@ client.interceptors.request.use((config) => {
   if (token) config.headers.Authorization = `Bearer ${token}`
   return config
 })
+
+// a 401 means the token is expired/invalid server-side — drop the stale session immediately
+client.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401 && authSession.token()) {
+      authSession.clear()
+      useAppStore.getState().setOwner(null)
+    }
+    return Promise.reject(error)
+  },
+)
 
 /**
  * A same-origin `/api/*` call against a misconfigured deploy resolves (200 OK)

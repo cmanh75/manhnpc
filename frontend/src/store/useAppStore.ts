@@ -16,6 +16,14 @@ interface AppState {
   setOwner: (session: OwnerSession | null) => void
 }
 
+function initialOwner(): OwnerSession | null {
+  if (authSession.isExpired()) {
+    authSession.clear()
+    return null
+  }
+  return authSession.get()
+}
+
 export const useAppStore = create<AppState>((set) => ({
   selectedPlace: null,
   setSelectedPlace: (selectedPlace) => set({ selectedPlace }),
@@ -26,6 +34,6 @@ export const useAppStore = create<AppState>((set) => ({
   booted: false,
   setBooted: () => set({ booted: true }),
 
-  owner: authSession.get(),
+  owner: initialOwner(),
   setOwner: (owner) => set({ owner }),
 }))
