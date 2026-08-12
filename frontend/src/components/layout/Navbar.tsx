@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import { Link, NavLink, useLocation } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Command, Terminal } from 'lucide-react'
+import { Command, LogOut, Terminal } from 'lucide-react'
 import { clsx } from '../../lib/utils'
 import { useAppStore } from '../../store/useAppStore'
+import { auth } from '../../lib/api'
 
 const links = [
   { to: '/', label: 'home', end: true },
@@ -18,6 +19,7 @@ export function Navbar() {
   const [scrolled, setScrolled] = useState(false)
   const setPaletteOpen = useAppStore((s) => s.setPaletteOpen)
   const owner = useAppStore((s) => s.owner)
+  const setOwner = useAppStore((s) => s.setOwner)
   const location = useLocation()
   const navLinks = owner ? [...links, { to: '/journal', label: 'journal' }, { to: '/audit', label: 'audit' }] : links
 
@@ -78,14 +80,28 @@ export function Navbar() {
 
         <div className="flex items-center gap-2">
           {owner && (
-            <Link
-              to="/login"
-              className="hidden items-center gap-1.5 rounded-lg bg-mint/10 px-2.5 py-1.5 font-mono text-[11px] text-mint ring-1 ring-mint/30 transition hover:ring-mint/60 sm:flex"
-              title="Owner mode — click to manage session"
-            >
-              <span className="size-1.5 rounded-full bg-mint shadow-[0_0_6px_#34d399]" />
-              owner
-            </Link>
+            <>
+              <Link
+                to="/login"
+                className="hidden items-center gap-1.5 rounded-lg bg-mint/10 px-2.5 py-1.5 font-mono text-[11px] text-mint ring-1 ring-mint/30 transition hover:ring-mint/60 sm:flex"
+                title="Owner mode — click to manage session"
+              >
+                <span className="size-1.5 rounded-full bg-mint shadow-[0_0_6px_#34d399]" />
+                owner
+              </Link>
+              <button
+                onClick={() => {
+                  auth.logout()
+                  setOwner(null)
+                }}
+                className="glass flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-mono text-[11px] text-muted transition hover:text-pink hover:ring-1 hover:ring-pink/40"
+                title="Log out"
+                aria-label="Log out"
+              >
+                <LogOut size={12} />
+                <span className="hidden sm:inline">log out</span>
+              </button>
+            </>
           )}
           <button
             onClick={() => setPaletteOpen(true)}
