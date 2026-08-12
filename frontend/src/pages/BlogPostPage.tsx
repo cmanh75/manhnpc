@@ -78,7 +78,7 @@ export function BlogPostPage() {
           </header>
 
           <div className="relative mb-12 overflow-hidden rounded-3xl">
-            <img src={post.coverImage} alt="" className="aspect-[1200/630] w-full object-cover" />
+            <img src={post.coverImage} alt="" loading="lazy" className="aspect-[1200/630] w-full object-cover" />
             <div className="absolute inset-0 ring-1 ring-inset ring-white/10" />
           </div>
 
