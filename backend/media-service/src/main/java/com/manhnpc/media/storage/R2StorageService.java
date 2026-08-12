@@ -2,6 +2,8 @@ package com.manhnpc.media.storage;
 
 import java.io.IOException;
 import java.net.URI;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -63,6 +65,20 @@ public class R2StorageService {
                         .contentLength(file.getSize())
                         .build(),
                 RequestBody.fromInputStream(file.getInputStream(), file.getSize()));
+        return new UploadResult(key, publicBaseUrl + "/" + key);
+    }
+
+    /** Uploads a server-generated file (e.g. a transcoded video or extracted thumbnail), not a direct multipart upload. */
+    public UploadResult uploadFile(Path file, String contentType, String keyPrefix, String extension) throws IOException {
+        String key = keyPrefix + "/" + UUID.randomUUID() + extension;
+        client.putObject(
+                PutObjectRequest.builder()
+                        .bucket(bucket)
+                        .key(key)
+                        .contentType(contentType)
+                        .contentLength(Files.size(file))
+                        .build(),
+                RequestBody.fromFile(file));
         return new UploadResult(key, publicBaseUrl + "/" + key);
     }
 

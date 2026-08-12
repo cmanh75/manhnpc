@@ -40,6 +40,9 @@ public class Video {
     /** R2 object key backing {@link #url}; null for seeded/external URLs. */
     private String storageKey;
 
+    /** R2 object key backing {@link #thumbnailUrl}; null for seeded/picsum thumbnails. */
+    private String thumbnailKey;
+
     private int durationSeconds;
 
     private String category;

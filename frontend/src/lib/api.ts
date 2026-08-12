@@ -167,7 +167,9 @@ export const api = {
     if (meta.durationSeconds) form.append('durationSeconds', String(meta.durationSeconds))
     const { data } = await client.post('/media/videos/upload', form, {
       headers: { 'Content-Type': 'multipart/form-data' },
-      timeout: 180_000,
+      // server transcodes to H.264/AAC + extracts a thumbnail after the upload transfer completes,
+      // so this needs real headroom beyond just the transfer time
+      timeout: 300_000,
       onUploadProgress: onProgress && ((e) => onProgress(e.total ? Math.round((e.loaded / e.total) * 100) : 0)),
     })
     return assertJsonObject<Video>(data, 'uploadVideo')

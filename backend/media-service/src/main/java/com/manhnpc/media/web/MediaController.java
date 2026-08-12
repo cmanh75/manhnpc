@@ -6,8 +6,12 @@ import com.manhnpc.media.repository.PhotoRepository;
 import com.manhnpc.media.repository.VideoRepository;
 import com.manhnpc.media.storage.R2StorageService;
 import com.manhnpc.media.storage.R2StorageService.UploadResult;
+import com.manhnpc.media.storage.VideoProcessor;
+import com.manhnpc.media.storage.VideoProcessor.ProcessedVideo;
 import com.manhnpc.media.web.error.NotFoundException;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -32,11 +36,13 @@ public class MediaController {
     private final PhotoRepository photos;
     private final VideoRepository videos;
     private final R2StorageService storage;
+    private final VideoProcessor videoProcessor;
 
-    public MediaController(PhotoRepository photos, VideoRepository videos, R2StorageService storage) {
+    public MediaController(PhotoRepository photos, VideoRepository videos, R2StorageService storage, VideoProcessor videoProcessor) {
         this.photos = photos;
         this.videos = videos;
         this.storage = storage;
+        this.videoProcessor = videoProcessor;
     }
 
     @GetMapping("/photos")
@@ -114,20 +120,38 @@ public class MediaController {
                              @RequestParam(required = false) String description,
                              @RequestParam(defaultValue = "life") String category,
                              @RequestParam(defaultValue = "0") int durationSeconds) throws IOException {
-        UploadResult result = storage.upload(file, "videos");
-        // picsum's seed segment can't contain slashes/dots, so it can't be result.key() (e.g. "videos/<uuid>.mov") —
-        // that 404s. Use a fresh, plain UUID as the seed instead.
-        Video video = Video.builder()
-                .title(title)
-                .description(description)
-                .url(result.url())
-                .thumbnailUrl("https://picsum.photos/seed/" + UUID.randomUUID() + "/640/360")
-                .storageKey(result.key())
-                .durationSeconds(durationSeconds)
-                .category(category)
-                .createdAt(LocalDateTime.now())
-                .build();
-        return videos.save(video);
+        if (file == null || file.isEmpty()) {
+            throw new IllegalArgumentException("Uploaded file is empty");
+        }
+        Path input = Files.createTempFile("upload-", ".src");
+        ProcessedVideo processed = null;
+        try {
+            file.transferTo(input);
+            // re-encode to H.264/AAC MP4 regardless of source codec/container — browsers
+            // can't reliably decode arbitrary formats (e.g. HEVC .mov from screen recorders) —
+            // and grab a real frame instead of an unrelated placeholder thumbnail.
+            processed = videoProcessor.process(input);
+            UploadResult videoResult = storage.uploadFile(processed.video(), "video/mp4", "videos", ".mp4");
+            UploadResult thumbResult = storage.uploadFile(processed.thumbnail(), "image/jpeg", "thumbnails", ".jpg");
+            Video video = Video.builder()
+                    .title(title)
+                    .description(description)
+                    .url(videoResult.url())
+                    .thumbnailUrl(thumbResult.url())
+                    .storageKey(videoResult.key())
+                    .thumbnailKey(thumbResult.key())
+                    .durationSeconds(durationSeconds)
+                    .category(category)
+                    .createdAt(LocalDateTime.now())
+                    .build();
+            return videos.save(video);
+        } finally {
+            Files.deleteIfExists(input);
+            if (processed != null) {
+                Files.deleteIfExists(processed.video());
+                Files.deleteIfExists(processed.thumbnail());
+            }
+        }
     }
 
     @DeleteMapping("/photos/{id}")
@@ -143,6 +167,7 @@ public class MediaController {
         Video video = videos.findById(id).orElseThrow(() -> new NotFoundException("Video not found: " + id));
         videos.deleteById(id);
         storage.delete(video.getStorageKey());
+        storage.delete(video.getThumbnailKey());
         return ResponseEntity.noContent().build();
     }
 }

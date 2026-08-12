@@ -18,6 +18,10 @@ FROM eclipse-temurin:21-jre-alpine
 ARG SERVICE
 ENV SERVICE_NAME=${SERVICE}
 WORKDIR /app
+# media-service shells out to ffmpeg to transcode uploads and grab a real
+# thumbnail frame; installed on every image since this Dockerfile is shared,
+# but it's a one-time cached layer so the cost is image size, not build time.
+RUN apk add --no-cache ffmpeg
 RUN addgroup -S app && adduser -S app -G app
 COPY --from=build /workspace/${SERVICE}/target/${SERVICE}-1.0.0.jar /app/app.jar
 RUN mkdir -p /app/data /app/uploads && chown -R app:app /app

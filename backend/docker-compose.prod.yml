@@ -82,7 +82,8 @@ services:
       R2_PUBLIC_BASE_URL: ${R2_PUBLIC_BASE_URL}
     volumes:
       - media_data:/app/data
-    mem_limit: 384m
+    # ffmpeg transcoding needs real headroom alongside the JVM heap (70% of this limit)
+    mem_limit: 768m
 
   travel-service:
     <<: *service
