@@ -1,61 +1,12 @@
-import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
-import { Canvas, useFrame, useThree } from '@react-three/fiber'
+import { Suspense, useEffect, useRef, useState } from 'react'
+import { Canvas } from '@react-three/fiber'
 import { OrbitControls, Stars } from '@react-three/drei'
 import { EffectComposer, Bloom, Vignette } from '@react-three/postprocessing'
-import * as THREE from 'three'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
 import { Earth, GLOBE_RADIUS } from './Earth'
-import type { VisitedPlace } from '../../lib/types'
-import { latLngToVector3 } from '../../lib/utils'
-import { useAppStore } from '../../store/useAppStore'
 
-/**
- * Camera rig: when a place is selected, glide the camera around the
- * globe until the place faces the viewer. User interaction cancels it.
- */
-function CameraRig({ controlsRef }: { controlsRef: React.RefObject<OrbitControlsImpl | null> }) {
-  const { camera } = useThree()
-  const selectedPlace = useAppStore((s) => s.selectedPlace)
-  const targetDir = useRef<THREE.Vector3 | null>(null)
-  const tmp = useMemo(() => new THREE.Vector3(), [])
-
-  useEffect(() => {
-    if (selectedPlace) {
-      targetDir.current = new THREE.Vector3(
-        ...latLngToVector3(selectedPlace.lat, selectedPlace.lng, 1),
-      ).normalize()
-    } else {
-      targetDir.current = null
-    }
-  }, [selectedPlace])
-
-  useEffect(() => {
-    const controls = controlsRef.current
-    if (!controls) return
-    const cancel = () => {
-      targetDir.current = null
-    }
-    controls.addEventListener('start', cancel)
-    return () => controls.removeEventListener('start', cancel)
-  }, [controlsRef])
-
-  useFrame(() => {
-    const dir = targetDir.current
-    if (!dir) return
-    const dist = camera.position.length()
-    tmp.copy(camera.position).normalize().lerp(dir, 0.065).normalize()
-    if (tmp.dot(dir) > 0.99995) targetDir.current = null
-    camera.position.copy(tmp.multiplyScalar(dist))
-    camera.lookAt(0, 0, 0)
-  })
-
-  return null
-}
-
-/** Pause auto-rotation while the user interacts or a place is open. */
+/** Pause auto-rotation while the user drags, resume a moment after they let go. */
 function AutoRotateManager({ controlsRef }: { controlsRef: React.RefObject<OrbitControlsImpl | null> }) {
-  const selectedPlace = useAppStore((s) => s.selectedPlace)
-
   useEffect(() => {
     const controls = controlsRef.current
     if (!controls) return
@@ -68,7 +19,7 @@ function AutoRotateManager({ controlsRef }: { controlsRef: React.RefObject<Orbit
     const scheduleResume = () => {
       if (timer) clearTimeout(timer)
       timer = setTimeout(() => {
-        if (!useAppStore.getState().selectedPlace) controls.autoRotate = true
+        controls.autoRotate = true
       }, 4000)
     }
     controls.addEventListener('start', stop)
@@ -80,29 +31,16 @@ function AutoRotateManager({ controlsRef }: { controlsRef: React.RefObject<Orbit
     }
   }, [controlsRef])
 
-  useEffect(() => {
-    const controls = controlsRef.current
-    if (!controls) return
-    if (selectedPlace) controls.autoRotate = false
-    else {
-      const timer = setTimeout(() => {
-        controls.autoRotate = true
-      }, 2500)
-      return () => clearTimeout(timer)
-    }
-  }, [selectedPlace, controlsRef])
-
   return null
 }
 
 interface GlobeSceneProps {
-  places: VisitedPlace[]
   className?: string
   /** softer settings for the hero embed */
   ambient?: boolean
 }
 
-export function GlobeScene({ places, className, ambient = false }: GlobeSceneProps) {
+export function GlobeScene({ className, ambient = false }: GlobeSceneProps) {
   const controlsRef = useRef<OrbitControlsImpl | null>(null)
   const [mobile, setMobile] = useState(() => window.matchMedia('(max-width: 767px)').matches)
 
@@ -123,7 +61,7 @@ export function GlobeScene({ places, className, ambient = false }: GlobeScenePro
       >
         <Suspense fallback={null}>
           <Stars radius={90} depth={50} count={mobile ? 1200 : ambient ? 2400 : 4200} factor={3.6} saturation={0} fade speed={0.5} />
-          <Earth places={places} dotDensity={mobile ? (ambient ? 0.4 : 0.65) : 1} />
+          <Earth dotDensity={mobile ? (ambient ? 0.4 : 0.65) : 1} />
           <OrbitControls
             ref={controlsRef}
             enablePan={false}
@@ -136,7 +74,6 @@ export function GlobeScene({ places, className, ambient = false }: GlobeScenePro
             maxDistance={GLOBE_RADIUS * 4.4}
             zoomSpeed={0.7}
           />
-          <CameraRig controlsRef={controlsRef} />
           <AutoRotateManager controlsRef={controlsRef} />
           {!(mobile && ambient) && (
             <EffectComposer multisampling={0}>

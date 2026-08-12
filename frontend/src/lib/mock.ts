@@ -1,32 +1,10 @@
-import type { VisitedPlace, Post, Photo, Video, Profile, TravelStats } from './types'
+import type { Post, Photo, Video, Profile } from './types'
 
 /**
  * Mock dataset mirroring the backend contract 1:1.
  * The API layer falls back to this data whenever the gateway
  * at :8080 is unreachable, so the site is always fully alive.
  */
-
-export const mockPlaces: VisitedPlace[] = [
-  { id: 1, name: 'Hanoi', country: 'Vietnam', countryCode: 'VN', lat: 21.0285, lng: 105.8542, visitedAt: '2019-01-01', description: 'Home base. Where every journey starts and ends — motorbikes, egg coffee and a thousand years of history.', highlight: 'Home is where the phở is', color: '#22d3ee', photosCount: 120, rating: 5 },
-  { id: 2, name: 'Sa Pa', country: 'Vietnam', countryCode: 'VN', lat: 22.3364, lng: 103.8438, visitedAt: '2019-04-14', description: 'Rice terraces stacked into the clouds. Trekked Fansipan and lost a shoe to the mud.', highlight: 'Clouds below my feet on Fansipan', color: '#34d399', photosCount: 43, rating: 5 },
-  { id: 3, name: 'Da Nang', country: 'Vietnam', countryCode: 'VN', lat: 16.0544, lng: 108.2022, visitedAt: '2019-08-02', description: 'Golden Bridge, Marble Mountains, and the best bánh xèo on the central coast.', highlight: 'Sunrise ride over Hải Vân Pass', color: '#fbbf24', photosCount: 58, rating: 5 },
-  { id: 4, name: 'Ho Chi Minh City', country: 'Vietnam', countryCode: 'VN', lat: 10.8231, lng: 106.6297, visitedAt: '2020-01-20', description: 'The city that never sleeps — rooftop cafés, Bùi Viện chaos and cơm tấm at 3am.', highlight: 'Cơm tấm at 3am hits different', color: '#f472b6', photosCount: 66, rating: 4 },
-  { id: 5, name: 'Bangkok', country: 'Thailand', countryCode: 'TH', lat: 13.7563, lng: 100.5018, visitedAt: '2022-06-11', description: 'First trip abroad after the pandemic. Temples, tuk-tuks and Chatuchak market marathons.', highlight: 'First stamp in the new passport', color: '#a78bfa', photosCount: 51, rating: 4 },
-  { id: 6, name: 'Singapore', country: 'Singapore', countryCode: 'SG', lat: 1.3521, lng: 103.8198, visitedAt: '2022-11-03', description: 'Gardens by the Bay glowing at night felt like walking through a sci-fi render.', highlight: 'Supertrees look like a shader demo', color: '#22d3ee', photosCount: 39, rating: 5 },
-  { id: 7, name: 'Kuala Lumpur', country: 'Malaysia', countryCode: 'MY', lat: 3.139, lng: 101.6869, visitedAt: '2023-03-18', description: 'Petronas Towers at midnight, Batu Caves at dawn, and endless nasi lemak in between.', highlight: '272 rainbow steps at Batu Caves', color: '#34d399', photosCount: 34, rating: 4 },
-  { id: 8, name: 'Bali', country: 'Indonesia', countryCode: 'ID', lat: -8.3405, lng: 115.092, visitedAt: '2023-09-07', description: 'Worked remotely from Canggu for two weeks. Surfed badly, coded well.', highlight: 'Deployed to prod from a beach café', color: '#fbbf24', photosCount: 72, rating: 5 },
-  { id: 9, name: 'Seoul', country: 'South Korea', countryCode: 'KR', lat: 37.5665, lng: 126.978, visitedAt: '2024-04-05', description: 'Cherry blossoms along Han River, late-night tteokbokki, and the Gangnam tech scene.', highlight: 'Cherry blossom snow in Yeouido', color: '#f472b6', photosCount: 64, rating: 5 },
-  { id: 10, name: 'Tokyo', country: 'Japan', countryCode: 'JP', lat: 35.6762, lng: 139.6503, visitedAt: '2024-11-22', description: 'Akihabara, teamLab Planets, and a 7-Eleven egg sando that changed my worldview.', highlight: 'teamLab felt like living inside WebGL', color: '#a78bfa', photosCount: 98, rating: 5 },
-  { id: 11, name: 'Sydney', country: 'Australia', countryCode: 'AU', lat: -33.8688, lng: 151.2093, visitedAt: '2025-07-19', description: 'First time south of the equator. Opera House, Bondi-to-Coogee walk, flat whites.', highlight: 'Winter in July broke my brain', color: '#34d399', photosCount: 47, rating: 4 },
-  { id: 12, name: 'Paris', country: 'France', countryCode: 'FR', lat: 48.8566, lng: 2.3522, visitedAt: '2026-05-30', description: 'Finally, Europe. Louvre queues, midnight baguettes, and the Eiffel Tower sparkling on the hour.', highlight: 'Wrote code in a 17th-century café', color: '#f472b6', photosCount: 85, rating: 5 },
-]
-
-export const mockTravelStats: TravelStats = {
-  countries: 9,
-  places: 12,
-  firstTrip: '2019-01-01',
-  latestTrip: '2026-05-30',
-}
 
 const md = (s: TemplateStringsArray) => s[0].trim()
 

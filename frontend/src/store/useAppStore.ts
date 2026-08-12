@@ -1,11 +1,7 @@
 import { create } from 'zustand'
-import type { VisitedPlace } from '../lib/types'
 import { authSession, type OwnerSession } from '../lib/auth-session'
 
 interface AppState {
-  selectedPlace: VisitedPlace | null
-  setSelectedPlace: (p: VisitedPlace | null) => void
-
   paletteOpen: boolean
   setPaletteOpen: (open: boolean) => void
 
@@ -25,9 +21,6 @@ function initialOwner(): OwnerSession | null {
 }
 
 export const useAppStore = create<AppState>((set) => ({
-  selectedPlace: null,
-  setSelectedPlace: (selectedPlace) => set({ selectedPlace }),
-
   paletteOpen: false,
   setPaletteOpen: (paletteOpen) => set({ paletteOpen }),
 

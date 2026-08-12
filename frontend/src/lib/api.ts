@@ -1,6 +1,6 @@
 import axios from 'axios'
-import type { VisitedPlace, TravelStats, Post, PagedPosts, Photo, Video, Profile, GuestbookEntry, JournalEntry, PagedVisits, VisitStats } from './types'
-import { mockPlaces, mockTravelStats, mockPosts, mockPhotos, mockVideos, mockProfile } from './mock'
+import type { Post, PagedPosts, Photo, Video, Profile, GuestbookEntry, JournalEntry, PagedVisits, VisitStats } from './types'
+import { mockPosts, mockPhotos, mockVideos, mockProfile } from './mock'
 import { authSession, type OwnerSession } from './auth-session'
 import { useAppStore } from '../store/useAppStore'
 export type { OwnerSession } from './auth-session'
@@ -81,14 +81,6 @@ async function withFallback<T>(request: () => Promise<T>, fallback: T): Promise<
 
 export const api = {
   isBackendAlive: () => backendAlive,
-
-  async getPlaces(): Promise<VisitedPlace[]> {
-    return withFallback(async () => (await client.get('/travel/locations')).data, mockPlaces)
-  },
-
-  async getTravelStats(): Promise<TravelStats> {
-    return withFallback(async () => (await client.get('/travel/stats')).data, mockTravelStats)
-  },
 
   async getPosts(params?: { tag?: string; q?: string; page?: number; size?: number }): Promise<PagedPosts> {
     const fallback: PagedPosts = {

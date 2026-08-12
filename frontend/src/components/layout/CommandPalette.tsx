@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Globe2, Home, Image, FileText, User, MessageSquare, Search, CornerDownLeft, Sparkles, Lock, MapPin } from 'lucide-react'
+import { Globe2, Home, Image, FileText, User, MessageSquare, Search, CornerDownLeft, Sparkles, Lock } from 'lucide-react'
 import { GithubIcon } from '../ui/BrandIcons'
 import { MatrixRain } from '../ui/Effects'
 import { useAppStore } from '../../store/useAppStore'
 import { clsx } from '../../lib/utils'
 import { api } from '../../lib/api'
-import type { Post, VisitedPlace } from '../../lib/types'
+import type { Post } from '../../lib/types'
 
 interface Command {
   id: string
@@ -25,14 +25,12 @@ export function CommandPalette() {
   const [active, setActive] = useState(0)
   const [matrix, setMatrix] = useState(false)
   const [posts, setPosts] = useState<Post[]>([])
-  const [places, setPlaces] = useState<VisitedPlace[]>([])
   const inputRef = useRef<HTMLInputElement>(null)
 
   // lazily load searchable content the first time the palette opens
   useEffect(() => {
     if (!open || posts.length > 0) return
     api.getPosts({ size: 50 }).then((p) => setPosts(p.content))
-    api.getPlaces().then(setPlaces)
   }, [open, posts.length])
 
   const commands = useMemo<Command[]>(
@@ -55,18 +53,7 @@ export function CommandPalette() {
     const q = query.toLowerCase()
     const base = commands.filter((c) => c.label.toLowerCase().includes(q) || c.hint.includes(q))
 
-    // dynamic results: fly to a place on the globe, or open a blog post
-    const placeHits: Command[] = places
-      .filter((p) => p.name.toLowerCase().includes(q) || p.country.toLowerCase().includes(q))
-      .slice(0, 4)
-      .map((p) => ({
-        id: `place-${p.id}`,
-        label: `Fly to ${p.name}`,
-        hint: p.country,
-        icon: <MapPin size={15} style={{ color: p.color }} />,
-        action: () => navigate('/globe', { state: { flyTo: p.id } }),
-      }))
-
+    // dynamic results: open a matching blog post
     const postHits: Command[] = posts
       .filter((p) => p.title.toLowerCase().includes(q) || p.tags.some((t) => t.includes(q)))
       .slice(0, 4)
@@ -78,8 +65,8 @@ export function CommandPalette() {
         action: () => navigate(`/blog/${p.slug}`),
       }))
 
-    return [...base, ...placeHits, ...postHits]
-  }, [commands, query, places, posts, navigate])
+    return [...base, ...postHits]
+  }, [commands, query, posts, navigate])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

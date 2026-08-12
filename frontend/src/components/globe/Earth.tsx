@@ -1,10 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { Html, Line } from '@react-three/drei'
 import * as THREE from 'three'
-import type { VisitedPlace } from '../../lib/types'
 import { latLngToVector3 } from '../../lib/utils'
-import { useAppStore } from '../../store/useAppStore'
 
 export const GLOBE_RADIUS = 2
 
@@ -168,7 +165,8 @@ function GlobeBody() {
 }
 
 /* ================================================================== */
-/*  Atmosphere — additive fresnel halo on a backside sphere           */
+/*  Atmosphere — layered additive fresnel halo (cyan core, violet     */
+/*  outer bloom) on backside spheres, purely decorative               */
 /* ================================================================== */
 
 const atmoVertex = /* glsl */ `
@@ -181,17 +179,22 @@ const atmoVertex = /* glsl */ `
 
 const atmoFragment = /* glsl */ `
   uniform vec3 uColor;
+  uniform float uPower;
+  uniform float uBias;
   varying vec3 vNormal;
   void main() {
-    float intensity = pow(0.62 - dot(vNormal, vec3(0.0, 0.0, 1.0)), 2.4);
+    float intensity = pow(uBias - dot(vNormal, vec3(0.0, 0.0, 1.0)), uPower);
     gl_FragColor = vec4(uColor, 1.0) * intensity;
   }
 `
 
-function Atmosphere() {
-  const uniforms = useMemo(() => ({ uColor: { value: new THREE.Color('#38bdf8') } }), [])
+function AtmosphereLayer({ scale, color, power, bias }: { scale: number; color: string; power: number; bias: number }) {
+  const uniforms = useMemo(
+    () => ({ uColor: { value: new THREE.Color(color) }, uPower: { value: power }, uBias: { value: bias } }),
+    [color, power, bias],
+  )
   return (
-    <mesh scale={1.18}>
+    <mesh scale={scale}>
       <sphereGeometry args={[GLOBE_RADIUS, 48, 48]} />
       <shaderMaterial
         vertexShader={atmoVertex}
@@ -206,246 +209,107 @@ function Atmosphere() {
   )
 }
 
-/* ================================================================== */
-/*  Markers — pulsing ring + light pillar + glowing core per place    */
-/* ================================================================== */
-
-const ringVertex = /* glsl */ `
-  varying vec2 vUv;
-  void main() {
-    vUv = uv;
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-  }
-`
-
-const ringFragment = /* glsl */ `
-  uniform float uTime;
-  uniform float uSeed;
-  uniform vec3 uColor;
-  varying vec2 vUv;
-  void main() {
-    float d = length(vUv - 0.5) * 2.0;
-    // expanding sonar ring
-    float r = fract(uTime * 0.45 + uSeed);
-    float ring = smoothstep(r - 0.09, r, d) * (1.0 - smoothstep(r, r + 0.05, d));
-    float fade = 1.0 - r;
-    // solid glowing core
-    float core = smoothstep(0.22, 0.05, d);
-    float a = ring * fade * 0.9 + core;
-    if (a < 0.01) discard;
-    gl_FragColor = vec4(uColor, a);
-  }
-`
-
-const pillarVertex = /* glsl */ `
-  varying vec2 vUv;
-  void main() {
-    vUv = uv;
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-  }
-`
-
-const pillarFragment = /* glsl */ `
-  uniform vec3 uColor;
-  uniform float uTime;
-  uniform float uSeed;
-  varying vec2 vUv;
-  void main() {
-    float pulse = 0.75 + 0.25 * sin(uTime * 2.2 + uSeed * 6.2831);
-    float a = pow(1.0 - vUv.y, 2.2) * 0.75 * pulse;
-    gl_FragColor = vec4(uColor, a);
-  }
-`
-
-interface MarkerProps {
-  place: VisitedPlace
-  index: number
-  selected: boolean
-  onSelect: (p: VisitedPlace) => void
+function Atmosphere() {
+  return (
+    <>
+      <AtmosphereLayer scale={1.18} color="#38bdf8" power={2.4} bias={0.62} />
+      {/* wider, softer violet halo bleeding further out for extra depth */}
+      <AtmosphereLayer scale={1.34} color="#a78bfa" power={3.1} bias={0.66} />
+    </>
+  )
 }
 
-function Marker({ place, index, selected, onSelect }: MarkerProps) {
-  const [hovered, setHovered] = useState(false)
-  const ringMat = useRef<THREE.ShaderMaterial>(null)
-  const pillarMat = useRef<THREE.ShaderMaterial>(null)
+/* ================================================================== */
+/*  Orbit ring — a sparse belt of twinkling, multi-colored dust        */
+/*  slowly circling the globe. Purely decorative, no data behind it.  */
+/* ================================================================== */
 
-  const position = useMemo(
-    () => new THREE.Vector3(...latLngToVector3(place.lat, place.lng, GLOBE_RADIUS * 1.008)),
-    [place.lat, place.lng],
-  )
+const RING_COLORS = ['#22d3ee', '#a78bfa', '#f472b6', '#34d399', '#fbbf24']
 
-  const quaternion = useMemo(() => {
-    const q = new THREE.Quaternion()
-    q.setFromUnitVectors(new THREE.Vector3(0, 0, 1), position.clone().normalize())
-    return q
-  }, [position])
+const ringDotsVertex = /* glsl */ `
+  attribute float aSeed;
+  attribute vec3 aColor;
+  uniform float uTime;
+  uniform float uSize;
+  varying float vAlpha;
+  varying vec3 vColor;
 
-  const ringUniforms = useMemo(
-    () => ({
-      uTime: { value: 0 },
-      uSeed: { value: (index * 0.37) % 1 },
-      uColor: { value: new THREE.Color(place.color) },
-    }),
-    [index, place.color],
-  )
+  void main() {
+    vec4 mv = modelViewMatrix * vec4(position, 1.0);
+    float tw = 0.5 + 0.5 * sin(uTime * 1.1 + aSeed * 6.2831);
+    gl_PointSize = uSize * (0.6 + tw) * (11.0 / -mv.z);
+    vAlpha = tw;
+    vColor = aColor;
+    gl_Position = projectionMatrix * mv;
+  }
+`
 
-  const pillarUniforms = useMemo(
-    () => ({
-      uTime: { value: 0 },
-      uSeed: { value: (index * 0.37) % 1 },
-      uColor: { value: new THREE.Color(place.color) },
-    }),
-    [index, place.color],
-  )
+const ringDotsFragment = /* glsl */ `
+  varying float vAlpha;
+  varying vec3 vColor;
+  void main() {
+    float d = length(gl_PointCoord - 0.5);
+    if (d > 0.5) discard;
+    float a = smoothstep(0.5, 0.05, d);
+    gl_FragColor = vec4(vColor, a * (0.35 + vAlpha * 0.55));
+  }
+`
 
-  useFrame(({ clock }) => {
-    const t = clock.elapsedTime
-    if (ringMat.current) ringMat.current.uniforms.uTime.value = t
-    if (pillarMat.current) pillarMat.current.uniforms.uTime.value = t
+function OrbitRing() {
+  const groupRef = useRef<THREE.Group>(null)
+  const matRef = useRef<THREE.ShaderMaterial>(null)
+
+  const { positions, seeds, colors } = useMemo(() => {
+    const count = 220
+    const innerR = GLOBE_RADIUS * 2.15
+    const outerR = GLOBE_RADIUS * 2.55
+    const positions = new Float32Array(count * 3)
+    const seeds = new Float32Array(count)
+    const colors = new Float32Array(count * 3)
+    for (let i = 0; i < count; i++) {
+      const angle = Math.random() * Math.PI * 2
+      const radius = innerR + Math.random() * (outerR - innerR)
+      const height = (Math.random() - 0.5) * 0.22
+      positions[i * 3] = Math.cos(angle) * radius
+      positions[i * 3 + 1] = height
+      positions[i * 3 + 2] = Math.sin(angle) * radius
+      seeds[i] = Math.random()
+      const c = new THREE.Color(RING_COLORS[i % RING_COLORS.length])
+      colors[i * 3] = c.r
+      colors[i * 3 + 1] = c.g
+      colors[i * 3 + 2] = c.b
+    }
+    return { positions, seeds, colors }
+  }, [])
+
+  const uniforms = useMemo(() => ({ uTime: { value: 0 }, uSize: { value: 1.6 } }), [])
+
+  useFrame(({ clock, gl }, delta) => {
+    if (matRef.current) {
+      matRef.current.uniforms.uTime.value = clock.elapsedTime
+      matRef.current.uniforms.uSize.value = 1.6 * gl.getPixelRatio()
+    }
+    if (groupRef.current) groupRef.current.rotation.y += delta * 0.035
   })
 
-  useEffect(() => {
-    document.body.style.cursor = hovered ? 'pointer' : ''
-    return () => {
-      document.body.style.cursor = ''
-    }
-  }, [hovered])
-
-  const scale = selected ? 1.5 : hovered ? 1.25 : 1
-
   return (
-    <group position={position} quaternion={quaternion}>
-      {/* sonar ring + core, facing outward */}
-      <mesh scale={scale}>
-        <planeGeometry args={[0.22, 0.22]} />
+    <group ref={groupRef} rotation={[THREE.MathUtils.degToRad(21), 0, THREE.MathUtils.degToRad(-6)]}>
+      <points>
+        <bufferGeometry>
+          <bufferAttribute attach="attributes-position" args={[positions, 3]} />
+          <bufferAttribute attach="attributes-aSeed" args={[seeds, 1]} />
+          <bufferAttribute attach="attributes-aColor" args={[colors, 3]} />
+        </bufferGeometry>
         <shaderMaterial
-          ref={ringMat}
-          vertexShader={ringVertex}
-          fragmentShader={ringFragment}
-          uniforms={ringUniforms}
+          ref={matRef}
+          vertexShader={ringDotsVertex}
+          fragmentShader={ringDotsFragment}
+          uniforms={uniforms}
           transparent
           depthWrite={false}
           blending={THREE.AdditiveBlending}
-          side={THREE.DoubleSide}
         />
-      </mesh>
-
-      {/* light pillar rising from the surface */}
-      <group rotation={[Math.PI / 2, 0, 0]}>
-        <mesh position={[0, -0.11, 0]} scale={[1, selected ? 1.7 : 1, 1]}>
-          <cylinderGeometry args={[0.008, 0.016, 0.22, 8, 1, true]} />
-          <shaderMaterial
-            ref={pillarMat}
-            vertexShader={pillarVertex}
-            fragmentShader={pillarFragment}
-            uniforms={pillarUniforms}
-            transparent
-            depthWrite={false}
-            blending={THREE.AdditiveBlending}
-            side={THREE.DoubleSide}
-          />
-        </mesh>
-      </group>
-
-      {/* invisible, generous hit target */}
-      <mesh
-        onClick={(e) => {
-          e.stopPropagation()
-          onSelect(place)
-        }}
-        onPointerOver={(e) => {
-          e.stopPropagation()
-          setHovered(true)
-        }}
-        onPointerOut={() => setHovered(false)}
-      >
-        <sphereGeometry args={[0.075, 8, 8]} />
-        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
-      </mesh>
-
-      {(hovered || selected) && (
-        <Html center distanceFactor={5.5} position={[0, 0.16, 0]} style={{ pointerEvents: 'none' }}>
-          <div
-            style={{
-              whiteSpace: 'nowrap',
-              padding: '5px 12px',
-              borderRadius: 999,
-              fontSize: 13,
-              fontFamily: "'JetBrains Mono', monospace",
-              color: '#e8ecf8',
-              background: 'rgba(8, 10, 26, 0.82)',
-              border: `1px solid ${place.color}66`,
-              boxShadow: `0 0 18px -2px ${place.color}55`,
-              backdropFilter: 'blur(8px)',
-            }}
-          >
-            <span style={{ color: place.color }}>●</span> {place.name}
-          </div>
-        </Html>
-      )}
-    </group>
-  )
-}
-
-/* ================================================================== */
-/*  Journey arcs — bezier ribbons + a comet tracing each hop          */
-/* ================================================================== */
-
-function buildArc(from: THREE.Vector3, to: THREE.Vector3): THREE.CubicBezierCurve3 {
-  const dist = from.distanceTo(to)
-  const lift = 1 + THREE.MathUtils.clamp(dist * 0.16, 0.08, 0.55)
-  const c1 = from.clone().lerp(to, 0.32).normalize().multiplyScalar(GLOBE_RADIUS * lift)
-  const c2 = from.clone().lerp(to, 0.68).normalize().multiplyScalar(GLOBE_RADIUS * lift)
-  return new THREE.CubicBezierCurve3(from, c1, c2, to)
-}
-
-function Comet({ curve, color, offset }: { curve: THREE.CubicBezierCurve3; color: string; offset: number }) {
-  const ref = useRef<THREE.Mesh>(null)
-  useFrame(({ clock }) => {
-    if (!ref.current) return
-    const t = (clock.elapsedTime * 0.08 + offset) % 1
-    curve.getPoint(t, ref.current.position)
-    const s = 0.6 + 0.4 * Math.sin(t * Math.PI)
-    ref.current.scale.setScalar(s)
-  })
-  return (
-    <mesh ref={ref}>
-      <sphereGeometry args={[0.02, 8, 8]} />
-      <meshBasicMaterial color={color} transparent opacity={0.95} blending={THREE.AdditiveBlending} depthWrite={false} />
-    </mesh>
-  )
-}
-
-function Arcs({ places }: { places: VisitedPlace[] }) {
-  const arcs = useMemo(() => {
-    const sorted = [...places].sort((a, b) => a.visitedAt.localeCompare(b.visitedAt))
-    const result: { curve: THREE.CubicBezierCurve3; points: THREE.Vector3[]; colorA: string; colorB: string }[] = []
-    for (let i = 0; i < sorted.length - 1; i++) {
-      const from = new THREE.Vector3(...latLngToVector3(sorted[i].lat, sorted[i].lng, GLOBE_RADIUS * 1.01))
-      const to = new THREE.Vector3(...latLngToVector3(sorted[i + 1].lat, sorted[i + 1].lng, GLOBE_RADIUS * 1.01))
-      const curve = buildArc(from, to)
-      result.push({ curve, points: curve.getPoints(48), colorA: sorted[i].color, colorB: sorted[i + 1].color })
-    }
-    return result
-  }, [places])
-
-  return (
-    <group>
-      {arcs.map((arc, i) => (
-        <group key={i}>
-          <Line
-            points={arc.points}
-            vertexColors={arc.points.map((_, j) => {
-              const c = new THREE.Color(arc.colorA).lerp(new THREE.Color(arc.colorB), j / (arc.points.length - 1))
-              return [c.r, c.g, c.b] as [number, number, number]
-            })}
-            lineWidth={1.1}
-            transparent
-            opacity={0.38}
-          />
-          <Comet curve={arc.curve} color={arc.colorB} offset={i * 0.145} />
-        </group>
-      ))}
+      </points>
     </group>
   )
 }
@@ -454,26 +318,15 @@ function Arcs({ places }: { places: VisitedPlace[] }) {
 /*  Earth — the full assembly                                          */
 /* ================================================================== */
 
-export function Earth({ places, dotDensity = 1 }: { places: VisitedPlace[]; dotDensity?: number }) {
+export function Earth({ dotDensity = 1 }: { dotDensity?: number }) {
   const groupRef = useRef<THREE.Group>(null)
-  const selectedPlace = useAppStore((s) => s.selectedPlace)
-  const setSelectedPlace = useAppStore((s) => s.setSelectedPlace)
 
   return (
     <group ref={groupRef}>
       <GlobeBody />
       <LandDots density={dotDensity} />
       <Atmosphere />
-      <Arcs places={places} />
-      {places.map((place, i) => (
-        <Marker
-          key={place.id}
-          place={place}
-          index={i}
-          selected={selectedPlace?.id === place.id}
-          onSelect={(p) => setSelectedPlace(selectedPlace?.id === p.id ? null : p)}
-        />
-      ))}
+      <OrbitRing />
     </group>
   )
 }

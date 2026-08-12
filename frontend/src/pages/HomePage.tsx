@@ -2,10 +2,9 @@ import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion, useScroll, useTransform } from 'framer-motion'
 import { ArrowRight, Globe2, Image as ImageIcon, FileText, MapPin, Sparkles } from 'lucide-react'
-import { PlaceCard } from '../components/globe/PlaceCard'
 import { PageShell, Reveal, CountUp, BackendBadge } from '../components/ui'
 import { TiltCard, Magnetic } from '../components/ui/Effects'
-import type { VisitedPlace, Post, Photo, Profile } from '../lib/types'
+import type { Post, Photo, Profile } from '../lib/types'
 import { formatDate } from '../lib/utils'
 
 const typedPhrases = ['software engineer.', 'world wanderer.', 'pixel perfectionist.', 'phở enthusiast.', 'system architect.']
@@ -60,7 +59,6 @@ function Typewriter() {
 }
 
 export function HomePage() {
-  const [places, setPlaces] = useState<VisitedPlace[]>([])
   const [posts, setPosts] = useState<Post[]>([])
   const [photos, setPhotos] = useState<Photo[]>([])
   const [profile, setProfile] = useState<Profile>(initialProfile)
@@ -79,14 +77,12 @@ export function HomePage() {
     let cancelled = false
     const load = async () => {
       const { api } = await import('../lib/api')
-      const [nextPlaces, nextPosts, nextPhotos, nextProfile] = await Promise.all([
-        api.getPlaces(),
+      const [nextPosts, nextPhotos, nextProfile] = await Promise.all([
         api.getPosts({ size: 3 }),
         api.getPhotos(),
         api.getProfile(),
       ])
       if (cancelled) return
-      setPlaces(nextPlaces)
       setPosts(nextPosts.content.slice(0, 3))
       setPhotos(nextPhotos.filter((photo) => photo.featured).slice(0, 4))
       setProfile(nextProfile)
@@ -132,7 +128,7 @@ export function HomePage() {
               />
             ) : (
               <Suspense fallback={null}>
-                <GlobeScene places={places} ambient className="size-full" />
+                <GlobeScene ambient className="size-full" />
               </Suspense>
             ))}
           </motion.div>
@@ -197,8 +193,8 @@ export function HomePage() {
                 </div>
                 <div className="h-8 w-px bg-white/10" />
                 <div>
-                  <div className="text-2xl font-bold text-ink"><CountUp to={places.length} /></div>
-                  <div className="text-xs text-faint">pins on the globe</div>
+                  <div className="text-2xl font-bold text-ink"><CountUp to={profile.stats.projectsCompleted} /></div>
+                  <div className="text-xs text-faint">projects shipped</div>
                 </div>
                 <div className="h-8 w-px bg-white/10" />
                 <div>
@@ -209,8 +205,6 @@ export function HomePage() {
             </motion.div>
           </div>
         </motion.div>
-
-        <PlaceCard />
 
         {/* scroll hint */}
         <motion.div

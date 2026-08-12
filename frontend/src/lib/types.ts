@@ -1,25 +1,3 @@
-export interface VisitedPlace {
-  id: number
-  name: string
-  country: string
-  countryCode: string
-  lat: number
-  lng: number
-  visitedAt: string
-  description: string
-  highlight: string
-  color: string
-  photosCount: number
-  rating: number
-}
-
-export interface TravelStats {
-  countries: number
-  places: number
-  firstTrip: string
-  latestTrip: string
-}
-
 export interface Post {
   id: number
   title: string
