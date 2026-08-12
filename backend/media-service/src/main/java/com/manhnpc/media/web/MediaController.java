@@ -115,11 +115,13 @@ public class MediaController {
                              @RequestParam(defaultValue = "life") String category,
                              @RequestParam(defaultValue = "0") int durationSeconds) throws IOException {
         UploadResult result = storage.upload(file, "videos");
+        // picsum's seed segment can't contain slashes/dots, so it can't be result.key() (e.g. "videos/<uuid>.mov") —
+        // that 404s. Use a fresh, plain UUID as the seed instead.
         Video video = Video.builder()
                 .title(title)
                 .description(description)
                 .url(result.url())
-                .thumbnailUrl("https://picsum.photos/seed/" + result.key() + "/640/360")
+                .thumbnailUrl("https://picsum.photos/seed/" + UUID.randomUUID() + "/640/360")
                 .storageKey(result.key())
                 .durationSeconds(durationSeconds)
                 .category(category)
