@@ -62,6 +62,16 @@ public class Photo {
     @Builder.Default
     private boolean featured = false;
 
-    @Builder.Default
-    private long views = 0L;
+    /** Nullable so ddl-auto's ALTER TABLE (adding this column after the table already has rows)
+     *  doesn't try a NOT NULL column with no default, which H2 rejects on non-empty tables — same
+     *  reasoning as {@link #position}. Null/0 for rows predating this column. */
+    private Long views;
+
+    public long getViews() {
+        return views == null ? 0L : views;
+    }
+
+    public void setViews(long views) {
+        this.views = views;
+    }
 }
