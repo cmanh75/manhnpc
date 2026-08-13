@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion, useScroll, useTransform } from 'framer-motion'
 import { ArrowRight, ExternalLink, GraduationCap, Globe2, Image as ImageIcon, FileText, MapPin, Sparkles } from 'lucide-react'
-import { PageShell, Reveal, CountUp, BackendBadge } from '../components/ui'
+import { PageShell, Reveal, BackendBadge } from '../components/ui'
 import { TiltCard, Magnetic } from '../components/ui/Effects'
 import type { Post, Photo, Profile } from '../lib/types'
 import { formatDate } from '../lib/utils'
@@ -186,22 +186,6 @@ export function HomePage() {
                 </Magnetic>
               </div>
 
-              <div className="mt-10 flex items-center gap-8 font-mono text-sm">
-                <div>
-                  <div className="text-2xl font-bold text-ink"><CountUp to={profile.stats.countriesVisited} /></div>
-                  <div className="text-xs text-faint">countries</div>
-                </div>
-                <div className="h-8 w-px bg-white/10" />
-                <div>
-                  <div className="text-2xl font-bold text-ink"><CountUp to={profile.stats.projectsCompleted} /></div>
-                  <div className="text-xs text-faint">projects shipped</div>
-                </div>
-                <div className="h-8 w-px bg-white/10" />
-                <div>
-                  <div className="text-2xl font-bold text-ink"><CountUp to={profile.stats.yearsOfExperience} suffix="+" /></div>
-                  <div className="text-xs text-faint">years shipping</div>
-                </div>
-              </div>
             </motion.div>
           </div>
         </motion.div>
