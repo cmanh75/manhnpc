@@ -1,19 +1,37 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Search, Eye, Clock } from 'lucide-react'
+import { Search, Eye, Clock, Trash2 } from 'lucide-react'
 import { PageShell, SectionHeading, Reveal } from '../components/ui'
 import { api } from '../lib/api'
 import type { Post } from '../lib/types'
 import { clsx, formatDate, formatNumber } from '../lib/utils'
+import { useAppStore } from '../store/useAppStore'
 
 export function BlogPage() {
+  const owner = useAppStore((s) => s.owner)
   const [posts, setPosts] = useState<Post[]>([])
   const [query, setQuery] = useState('')
   const [tag, setTag] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<number | null>(null)
 
   useEffect(() => {
     api.getPosts({ size: 50 }).then((p) => setPosts(p.content)).catch(() => {})
   }, [])
+
+  async function deletePost(e: React.MouseEvent, post: Post) {
+    e.preventDefault()
+    e.stopPropagation()
+    if (!confirm(`Delete "${post.title}"?`)) return
+    setDeletingId(post.id)
+    try {
+      await api.deletePost(post.id)
+      setPosts((prev) => prev.filter((p) => p.id !== post.id))
+    } catch {
+      alert('could not delete')
+    } finally {
+      setDeletingId(null)
+    }
+  }
 
   const tags = useMemo(() => {
     const counts = new Map<string, number>()
@@ -82,7 +100,7 @@ export function BlogPage() {
         <Reveal>
           <Link
             to={`/blog/${featured.slug}`}
-            className="border-beam glass group mb-8 grid overflow-hidden rounded-3xl md:grid-cols-2"
+            className="border-beam glass group relative mb-8 grid overflow-hidden rounded-3xl md:grid-cols-2"
           >
             <div className="relative min-h-56 overflow-hidden">
               <img
@@ -96,6 +114,16 @@ export function BlogPage() {
                 latest
               </span>
             </div>
+            {owner && (
+              <button
+                onClick={(e) => deletePost(e, featured)}
+                disabled={deletingId === featured.id}
+                className="absolute right-4 top-4 z-10 grid size-8 place-items-center rounded-full bg-black/55 text-ink opacity-100 backdrop-blur transition hover:bg-pink/70 disabled:opacity-40 md:opacity-0 md:group-hover:opacity-100"
+                aria-label="Delete post"
+              >
+                <Trash2 size={14} />
+              </button>
+            )}
             <div className="flex flex-col justify-center p-7 md:p-9">
               <div className="mb-3 flex items-center gap-3 font-mono text-[11px] text-faint">
                 <span>{formatDate(featured.createdAt)}</span>
@@ -122,7 +150,7 @@ export function BlogPage() {
           <Reveal key={post.id} delay={(i % 2) * 0.08}>
             <Link
               to={`/blog/${post.slug}`}
-              className="border-beam glass group flex h-full flex-col overflow-hidden rounded-2xl transition hover:bg-white/[0.06]"
+              className="border-beam glass group relative flex h-full flex-col overflow-hidden rounded-2xl transition hover:bg-white/[0.06]"
             >
               <div className="relative h-44 overflow-hidden">
                 <img
@@ -133,6 +161,16 @@ export function BlogPage() {
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-space/90 to-transparent" />
               </div>
+              {owner && (
+                <button
+                  onClick={(e) => deletePost(e, post)}
+                  disabled={deletingId === post.id}
+                  className="absolute right-3 top-3 z-10 grid size-8 place-items-center rounded-full bg-black/55 text-ink opacity-100 backdrop-blur transition hover:bg-pink/70 disabled:opacity-40 md:opacity-0 md:group-hover:opacity-100"
+                  aria-label="Delete post"
+                >
+                  <Trash2 size={14} />
+                </button>
+              )}
               <div className="flex flex-1 flex-col p-6">
                 <div className="mb-2.5 flex items-center gap-3 font-mono text-[11px] text-faint">
                   <span>{formatDate(post.createdAt)}</span>
