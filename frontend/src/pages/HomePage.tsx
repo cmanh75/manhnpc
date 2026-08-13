@@ -184,6 +184,18 @@ export function HomePage() {
                     whoami
                   </Link>
                 </Magnetic>
+                <Magnetic>
+                  <a
+                    href="https://english.manhnpc.com/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="group inline-flex items-center gap-2 rounded-xl bg-mint/10 px-5 py-3 font-mono text-sm text-mint ring-1 ring-mint/30 transition hover:bg-mint/20 hover:ring-mint/60"
+                  >
+                    <GraduationCap size={16} />
+                    english.manhnpc.com
+                    <ExternalLink size={13} className="transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                  </a>
+                </Magnetic>
               </div>
 
             </motion.div>
