@@ -239,8 +239,7 @@ export function HomePage() {
               <TiltCard className="rounded-2xl">
                 <Link
                   to={`/gallery?open=photo-${photo.id}`}
-                  className="border-beam group relative block overflow-hidden rounded-2xl bg-panel"
-                  style={{ aspectRatio: i % 3 === 1 ? '3/4' : '4/5' }}
+                  className="border-beam group relative block aspect-[4/5] overflow-hidden rounded-2xl bg-panel"
                 >
                   <img
                     src={photo.thumbnailUrl}
