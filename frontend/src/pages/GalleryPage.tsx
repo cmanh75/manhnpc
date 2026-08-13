@@ -262,22 +262,39 @@ function useDragToScroll(trackRef: RefObject<HTMLDivElement | null>) {
 }
 
 /** Instagram-style swipeable carousel embedded in a feed card, with dot indicators.
- *  Members can be a mix of photos and videos — a fixed aspect ratio keeps every slide the
- *  same size regardless of which type it is, instead of each photo's own intrinsic height. */
+ *  Members can be a mix of photos and videos — the box always spans the full card width and
+ *  its height follows whichever slide is currently active, so each item shows uncropped. */
 function MediaGroupCarousel({ members, title, onOpen }: { members: GroupMember[]; title: string; onOpen: (index: number) => void }) {
   const [active, setActive] = useState(0)
+  // Box height tracks whichever slide is active, so every photo/video fills the full card width
+  // with no side letterboxing and (once its own aspect ratio is known) no vertical cropping either —
+  // only the fallback ratio before an image has loaded, or a brief mismatch mid-swipe, ever crops.
+  const [aspect, setAspect] = useState(4 / 5)
+  const aspectByIndex = useRef<Record<number, number>>({})
   const trackRef = useRef<HTMLDivElement>(null)
   const drag = useDragToScroll(trackRef)
 
   function handleScroll() {
     const el = trackRef.current
     if (!el) return
-    const index = Math.round(el.scrollLeft / el.clientWidth)
-    setActive(Math.min(members.length - 1, Math.max(0, index)))
+    const index = Math.min(members.length - 1, Math.max(0, Math.round(el.scrollLeft / el.clientWidth)))
+    setActive(index)
+    const known = aspectByIndex.current[index]
+    if (known) setAspect(known)
+  }
+
+  function onMediaLoad(index: number, naturalWidth: number, naturalHeight: number) {
+    if (!naturalWidth || !naturalHeight) return
+    const ratio = naturalWidth / naturalHeight
+    aspectByIndex.current[index] = ratio
+    if (index === active) setAspect(ratio)
   }
 
   return (
-    <div className="relative aspect-[4/5] w-full overflow-hidden bg-black">
+    <div
+      className="relative w-full overflow-hidden bg-black transition-[aspect-ratio] duration-300"
+      style={{ aspectRatio: aspect }}
+    >
       <div
         ref={trackRef}
         onScroll={handleScroll}
@@ -297,7 +314,8 @@ function MediaGroupCarousel({ members, title, onOpen }: { members: GroupMember[]
               alt={title}
               loading="lazy"
               draggable={false}
-              className="absolute inset-0 size-full object-contain"
+              onLoad={(e) => onMediaLoad(i, e.currentTarget.naturalWidth, e.currentTarget.naturalHeight)}
+              className="absolute inset-0 size-full object-cover"
             />
             {member.kind === 'video' && (
               <>
