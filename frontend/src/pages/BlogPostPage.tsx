@@ -2,11 +2,11 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { motion, useScroll, useSpring } from 'framer-motion'
 import Markdown from 'react-markdown'
-import { ArrowLeft, Clock, Eye, Calendar, Trash2 } from 'lucide-react'
-import { PageShell, LikeButton } from '../components/ui'
+import { ArrowLeft, Clock, Calendar, Trash2 } from 'lucide-react'
+import { PageShell } from '../components/ui'
 import { api } from '../lib/api'
 import type { Post } from '../lib/types'
-import { formatDate, formatNumber } from '../lib/utils'
+import { formatDate } from '../lib/utils'
 import { useAppStore } from '../store/useAppStore'
 
 export function BlogPostPage() {
@@ -89,8 +89,6 @@ export function BlogPostPage() {
             <div className="mt-5 flex flex-wrap items-center gap-5 font-mono text-xs text-faint">
               <span className="flex items-center gap-1.5"><Calendar size={12} />{formatDate(post.createdAt)}</span>
               <span className="flex items-center gap-1.5"><Clock size={12} />{post.readingTime} min read</span>
-              <span className="flex items-center gap-1.5"><Eye size={12} />{formatNumber(post.views)} views</span>
-              <LikeButton likeKey={`post-${post.id}`} />
               {owner && (
                 <button
                   onClick={deletePost}

@@ -12,11 +12,13 @@ import { useAppStore } from '../store/useAppStore'
 const categories = ['all', 'travel', 'food', 'code', 'life'] as const
 const uploadCategories = categories.filter((c) => c !== 'all')
 
+/** A single photo or video inside a mixed multi-item post. */
+type GroupMember = { kind: 'photo'; photo: Photo } | { kind: 'video'; video: Video }
+
 type FeedItem =
   | { kind: 'photo'; id: number; date: string; category: string; photo: Photo }
-  | { kind: 'photo-group'; id: number; date: string; category: string; photos: Photo[] }
   | { kind: 'video'; id: number; date: string; category: string; video: Video }
-  | { kind: 'video-group'; id: number; date: string; category: string; videos: Video[] }
+  | { kind: 'group'; id: number; date: string; category: string; members: GroupMember[] }
 
 /** One entry per individually viewable photo/video, in feed order — what the fullscreen viewer navigates.
  *  groupIndex/groupTotal are set only for items that belong to a multi-photo/video post, so the
@@ -25,11 +27,18 @@ type ViewerItem =
   | { kind: 'photo'; id: number; date: string; photo: Photo; groupIndex?: number; groupTotal?: number }
   | { kind: 'video'; id: number; date: string; video: Video; groupIndex?: number; groupTotal?: number }
 
-/** Groups items sharing a groupId together (sorted by position), keeping ungrouped items standalone. */
-function groupByGroupId<T extends { groupId?: string | null; position?: number }>(items: T[]): { standalone: T[]; groups: T[][] } {
-  const standalone: T[] = []
-  const groups = new Map<string, T[]>()
-  for (const item of items) {
+/** Groups photos and videos sharing a groupId together (sorted by position, mixed types
+ *  allowed in one group), keeping ungrouped items standalone. */
+function toFeed(photos: Photo[], videos: Video[]): FeedItem[] {
+  type Tagged = { member: GroupMember; groupId?: string | null; position?: number; date: string; category: string; id: number }
+  const tagged: Tagged[] = [
+    ...photos.map((photo): Tagged => ({ member: { kind: 'photo', photo }, groupId: photo.groupId, position: photo.position, date: photo.takenAt, category: photo.category, id: photo.id })),
+    ...videos.map((video): Tagged => ({ member: { kind: 'video', video }, groupId: video.groupId, position: video.position, date: video.createdAt, category: video.category, id: video.id })),
+  ]
+
+  const standalone: Tagged[] = []
+  const groups = new Map<string, Tagged[]>()
+  for (const item of tagged) {
     if (item.groupId) {
       const group = groups.get(item.groupId) ?? []
       group.push(item)
@@ -38,23 +47,17 @@ function groupByGroupId<T extends { groupId?: string | null; position?: number }
       standalone.push(item)
     }
   }
-  return { standalone, groups: [...groups.values()].map((g) => [...g].sort((a, b) => (a.position ?? 0) - (b.position ?? 0))) }
-}
-
-function toFeed(photos: Photo[], videos: Video[]): FeedItem[] {
-  const photoGrouped = groupByGroupId(photos)
-  const videoGrouped = groupByGroupId(videos)
 
   const items: FeedItem[] = [
-    ...photoGrouped.standalone.map((photo): FeedItem => ({ kind: 'photo', id: photo.id, date: photo.takenAt, category: photo.category, photo })),
-    ...photoGrouped.groups.map((group): FeedItem => {
-      const first = group[0]
-      return { kind: 'photo-group', id: first.id, date: first.takenAt, category: first.category, photos: group }
-    }),
-    ...videoGrouped.standalone.map((video): FeedItem => ({ kind: 'video', id: video.id, date: video.createdAt, category: video.category, video })),
-    ...videoGrouped.groups.map((group): FeedItem => {
-      const first = group[0]
-      return { kind: 'video-group', id: first.id, date: first.createdAt, category: first.category, videos: group }
+    ...standalone.map((item): FeedItem =>
+      item.member.kind === 'photo'
+        ? { kind: 'photo', id: item.id, date: item.date, category: item.category, photo: item.member.photo }
+        : { kind: 'video', id: item.id, date: item.date, category: item.category, video: item.member.video },
+    ),
+    ...[...groups.values()].map((group): FeedItem => {
+      const sorted = [...group].sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+      const first = sorted[0]
+      return { kind: 'group', id: first.id, date: first.date, category: first.category, members: sorted.map((m) => m.member) }
     }),
   ]
   return items.sort((a, b) => b.date.localeCompare(a.date))
@@ -68,15 +71,15 @@ function toViewer(feed: FeedItem[]): { viewerItems: ViewerItem[]; startIndex: nu
     startIndex.push(viewerItems.length)
     if (item.kind === 'photo') {
       viewerItems.push({ kind: 'photo', id: item.photo.id, date: item.photo.takenAt, photo: item.photo })
-    } else if (item.kind === 'photo-group') {
-      item.photos.forEach((photo, idx) => {
-        viewerItems.push({ kind: 'photo', id: photo.id, date: photo.takenAt, photo, groupIndex: idx + 1, groupTotal: item.photos.length })
-      })
     } else if (item.kind === 'video') {
       viewerItems.push({ kind: 'video', id: item.video.id, date: item.video.createdAt, video: item.video })
     } else {
-      item.videos.forEach((video, idx) => {
-        viewerItems.push({ kind: 'video', id: video.id, date: video.createdAt, video, groupIndex: idx + 1, groupTotal: item.videos.length })
+      item.members.forEach((member, idx) => {
+        if (member.kind === 'photo') {
+          viewerItems.push({ kind: 'photo', id: member.photo.id, date: member.photo.takenAt, photo: member.photo, groupIndex: idx + 1, groupTotal: item.members.length })
+        } else {
+          viewerItems.push({ kind: 'video', id: member.video.id, date: member.video.createdAt, video: member.video, groupIndex: idx + 1, groupTotal: item.members.length })
+        }
       })
     }
   }
@@ -103,8 +106,7 @@ function feedItemTitle(item: FeedItem): string {
   switch (item.kind) {
     case 'video': return item.video.title
     case 'photo': return item.photo.title
-    case 'photo-group': return item.photos[0].title
-    case 'video-group': return item.videos[0].title
+    case 'group': { const first = item.members[0]; return first.kind === 'photo' ? first.photo.title : first.video.title }
   }
 }
 
@@ -112,14 +114,22 @@ function feedItemDescription(item: FeedItem): string {
   switch (item.kind) {
     case 'video': return item.video.description
     case 'photo': return item.photo.description
-    case 'photo-group': return item.photos[0].description
-    case 'video-group': return item.videos[0].description
+    case 'group': { const first = item.members[0]; return first.kind === 'photo' ? first.photo.description : first.video.description }
   }
+}
+
+/** A group's location comes from its first photo member, if any (videos have no location field). */
+function feedItemLocation(item: FeedItem): string {
+  if (item.kind === 'photo') return item.photo.location
+  if (item.kind === 'group') {
+    const firstPhoto = item.members.find((m): m is Extract<GroupMember, { kind: 'photo' }> => m.kind === 'photo')
+    return firstPhoto?.photo.location ?? ''
+  }
+  return ''
 }
 
 function emptyUploadForm() {
   return {
-    type: 'photo' as 'photo' | 'video',
     title: '',
     description: '',
     category: 'life' as (typeof uploadCategories)[number],
@@ -251,8 +261,10 @@ function useDragToScroll(trackRef: RefObject<HTMLDivElement | null>) {
   return { onPointerDown, onClickCapture }
 }
 
-/** Instagram-style swipeable carousel embedded in a feed card, with dot indicators. */
-function PhotoGroupCarousel({ photos, title, onOpen }: { photos: Photo[]; title: string; onOpen: (index: number) => void }) {
+/** Instagram-style swipeable carousel embedded in a feed card, with dot indicators.
+ *  Members can be a mix of photos and videos — a fixed aspect ratio keeps every slide the
+ *  same size regardless of which type it is, instead of each photo's own intrinsic height. */
+function MediaGroupCarousel({ members, title, onOpen }: { members: GroupMember[]; title: string; onOpen: (index: number) => void }) {
   const [active, setActive] = useState(0)
   const trackRef = useRef<HTMLDivElement>(null)
   const drag = useDragToScroll(trackRef)
@@ -261,96 +273,55 @@ function PhotoGroupCarousel({ photos, title, onOpen }: { photos: Photo[]; title:
     const el = trackRef.current
     if (!el) return
     const index = Math.round(el.scrollLeft / el.clientWidth)
-    setActive(Math.min(photos.length - 1, Math.max(0, index)))
+    setActive(Math.min(members.length - 1, Math.max(0, index)))
   }
 
   return (
-    <div className="relative">
+    <div className="relative aspect-[4/5] w-full overflow-hidden">
       <div
         ref={trackRef}
         onScroll={handleScroll}
         {...drag}
-        className="flex cursor-grab snap-x snap-mandatory overflow-x-auto scroll-smooth select-none [&::-webkit-scrollbar]:hidden active:cursor-grabbing"
+        className="flex h-full cursor-grab snap-x snap-mandatory overflow-x-auto scroll-smooth select-none [&::-webkit-scrollbar]:hidden active:cursor-grabbing"
         style={{ scrollbarWidth: 'none' }}
       >
-        {photos.map((photo, i) => (
-          <button key={photo.id} onClick={() => onOpen(i)} className="block w-full flex-none snap-center" data-cursor="pointer">
+        {members.map((member, i) => (
+          <button
+            key={member.kind === 'photo' ? `photo-${member.photo.id}` : `video-${member.video.id}`}
+            onClick={() => onOpen(i)}
+            className="relative block h-full w-full flex-none snap-center"
+            data-cursor="pointer"
+          >
             <img
-              src={photo.thumbnailUrl}
+              src={member.kind === 'photo' ? member.photo.thumbnailUrl : member.video.thumbnailUrl}
               alt={title}
               loading="lazy"
               draggable={false}
-              className="max-h-[560px] w-full object-cover"
+              className="absolute inset-0 size-full object-cover"
             />
+            {member.kind === 'video' && (
+              <>
+                <div className="absolute inset-0 grid place-items-center bg-black/20">
+                  <span className="grid size-14 place-items-center rounded-full bg-black/45 ring-1 ring-white/25 backdrop-blur">
+                    <Play size={20} className="ml-1 text-ink" fill="currentColor" />
+                  </span>
+                </div>
+                <span className="absolute bottom-3 right-3 flex items-center gap-1.5 rounded-md bg-black/60 px-2 py-1 font-mono text-[11px] text-ink backdrop-blur">
+                  <Clock size={10} />
+                  {formatDuration(member.video.durationSeconds)}
+                </span>
+              </>
+            )}
           </button>
         ))}
       </div>
-      {photos.length > 1 && (
+      {members.length > 1 && (
         <>
           <span className="absolute right-3 top-3 rounded-md bg-black/60 px-2 py-1 font-mono text-[11px] text-ink backdrop-blur">
-            {active + 1}/{photos.length}
+            {active + 1}/{members.length}
           </span>
           <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 gap-1.5">
-            {photos.map((_, i) => (
-              <span key={i} className={clsx('size-1.5 rounded-full transition', i === active ? 'bg-white' : 'bg-white/40')} />
-            ))}
-          </div>
-        </>
-      )}
-    </div>
-  )
-}
-
-/** Instagram-style swipeable carousel embedded in a feed card, for a multi-video post. */
-function VideoGroupCarousel({ videos, title, onOpen }: { videos: Video[]; title: string; onOpen: (index: number) => void }) {
-  const [active, setActive] = useState(0)
-  const trackRef = useRef<HTMLDivElement>(null)
-  const drag = useDragToScroll(trackRef)
-
-  function handleScroll() {
-    const el = trackRef.current
-    if (!el) return
-    const index = Math.round(el.scrollLeft / el.clientWidth)
-    setActive(Math.min(videos.length - 1, Math.max(0, index)))
-  }
-
-  return (
-    <div className="relative">
-      <div
-        ref={trackRef}
-        onScroll={handleScroll}
-        {...drag}
-        className="flex cursor-grab snap-x snap-mandatory overflow-x-auto scroll-smooth select-none [&::-webkit-scrollbar]:hidden active:cursor-grabbing"
-        style={{ scrollbarWidth: 'none' }}
-      >
-        {videos.map((video, i) => (
-          <button key={video.id} onClick={() => onOpen(i)} className="relative block aspect-video w-full flex-none snap-center" data-cursor="pointer">
-            <img
-              src={video.thumbnailUrl}
-              alt={title}
-              loading="lazy"
-              draggable={false}
-              className="size-full object-cover"
-            />
-            <div className="absolute inset-0 grid place-items-center bg-black/20">
-              <span className="grid size-14 place-items-center rounded-full bg-black/45 ring-1 ring-white/25 backdrop-blur">
-                <Play size={20} className="ml-1 text-ink" fill="currentColor" />
-              </span>
-            </div>
-            <span className="absolute bottom-3 right-3 flex items-center gap-1.5 rounded-md bg-black/60 px-2 py-1 font-mono text-[11px] text-ink backdrop-blur">
-              <Clock size={10} />
-              {formatDuration(video.durationSeconds)}
-            </span>
-          </button>
-        ))}
-      </div>
-      {videos.length > 1 && (
-        <>
-          <span className="absolute right-3 top-3 rounded-md bg-black/60 px-2 py-1 font-mono text-[11px] text-ink backdrop-blur">
-            {active + 1}/{videos.length}
-          </span>
-          <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 gap-1.5">
-            {videos.map((_, i) => (
+            {members.map((_, i) => (
               <span key={i} className={clsx('size-1.5 rounded-full transition', i === active ? 'bg-white' : 'bg-white/40')} />
             ))}
           </div>
@@ -377,7 +348,7 @@ export function GalleryPage() {
   const [deleting, setDeleting] = useState(false)
 
   const [showEdit, setShowEdit] = useState(false)
-  const [editForm, setEditForm] = useState({ title: '', description: '', category: 'life' as string, location: '', takenAt: '', file: null as File | null })
+  const [editForm, setEditForm] = useState({ title: '', description: '', category: 'life' as string, location: '', date: '', file: null as File | null })
   const [editing, setEditing] = useState(false)
   const [editProgress, setEditProgress] = useState(0)
   const [editError, setEditError] = useState<string | null>(null)
@@ -396,7 +367,7 @@ export function GalleryPage() {
       list = list.filter((item) => {
         const title = feedItemTitle(item)
         const description = feedItemDescription(item)
-        const location = item.kind === 'photo' ? item.photo.location : item.kind === 'photo-group' ? item.photos[0].location : ''
+        const location = feedItemLocation(item)
         return title.toLowerCase().includes(q) || description.toLowerCase().includes(q) || location.toLowerCase().includes(q)
       })
     }
@@ -472,30 +443,18 @@ export function GalleryPage() {
     setUploadProgress(0)
     setUploadError(null)
     try {
-      if (uploadForm.type === 'photo') {
-        const uploaded = await api.uploadPhotos(
-          uploadForm.files,
-          {
-            title: uploadForm.title.trim(),
-            description: uploadForm.description.trim() || undefined,
-            category: uploadForm.category,
-            location: uploadForm.location.trim() || undefined,
-          },
-          setUploadProgress,
-        )
-        setPhotos((prev) => [...uploaded, ...prev])
-      } else {
-        const uploaded = await api.uploadVideos(
-          uploadForm.files,
-          {
-            title: uploadForm.title.trim(),
-            description: uploadForm.description.trim() || undefined,
-            category: uploadForm.category,
-          },
-          setUploadProgress,
-        )
-        setVideos((prev) => [...uploaded, ...prev])
-      }
+      const uploaded = await api.uploadMedia(
+        uploadForm.files,
+        {
+          title: uploadForm.title.trim(),
+          description: uploadForm.description.trim() || undefined,
+          category: uploadForm.category,
+          location: uploadForm.location.trim() || undefined,
+        },
+        setUploadProgress,
+      )
+      setPhotos((prev) => [...uploaded.photos, ...prev])
+      setVideos((prev) => [...uploaded.videos, ...prev])
       setShowUpload(false)
       setUploadForm(emptyUploadForm())
     } catch {
@@ -527,15 +486,26 @@ export function GalleryPage() {
   }
 
   function openEdit() {
-    if (!current || current.kind !== 'photo') return
-    setEditForm({
-      title: current.photo.title,
-      description: current.photo.description ?? '',
-      category: current.photo.category,
-      location: current.photo.location ?? '',
-      takenAt: current.photo.takenAt.slice(0, 16),
-      file: null,
-    })
+    if (!current) return
+    if (current.kind === 'photo') {
+      setEditForm({
+        title: current.photo.title,
+        description: current.photo.description ?? '',
+        category: current.photo.category,
+        location: current.photo.location ?? '',
+        date: current.photo.takenAt.slice(0, 16),
+        file: null,
+      })
+    } else {
+      setEditForm({
+        title: current.video.title,
+        description: current.video.description ?? '',
+        category: current.video.category,
+        location: '',
+        date: current.video.createdAt.slice(0, 16),
+        file: null,
+      })
+    }
     setEditError(null)
     setShowEdit(true)
   }
@@ -544,24 +514,39 @@ export function GalleryPage() {
   useEffect(() => () => { if (editPreviewUrl) URL.revokeObjectURL(editPreviewUrl) }, [editPreviewUrl])
 
   async function submitEdit() {
-    if (!current || current.kind !== 'photo' || !editForm.title.trim()) return
+    if (!current || !editForm.title.trim()) return
     setEditing(true)
     setEditProgress(0)
     setEditError(null)
     try {
-      const updated = await api.updatePhoto(
-        current.photo.id,
-        {
-          file: editForm.file ?? undefined,
-          title: editForm.title.trim(),
-          description: editForm.description.trim(),
-          category: editForm.category,
-          location: editForm.location.trim(),
-          takenAt: editForm.takenAt || undefined,
-        },
-        setEditProgress,
-      )
-      setPhotos((prev) => prev.map((p) => (p.id === updated.id ? updated : p)))
+      if (current.kind === 'photo') {
+        const updated = await api.updatePhoto(
+          current.photo.id,
+          {
+            file: editForm.file ?? undefined,
+            title: editForm.title.trim(),
+            description: editForm.description.trim(),
+            category: editForm.category,
+            location: editForm.location.trim(),
+            takenAt: editForm.date || undefined,
+          },
+          setEditProgress,
+        )
+        setPhotos((prev) => prev.map((p) => (p.id === updated.id ? updated : p)))
+      } else {
+        const updated = await api.updateVideo(
+          current.video.id,
+          {
+            file: editForm.file ?? undefined,
+            title: editForm.title.trim(),
+            description: editForm.description.trim(),
+            category: editForm.category,
+            createdAt: editForm.date || undefined,
+          },
+          setEditProgress,
+        )
+        setVideos((prev) => prev.map((v) => (v.id === updated.id ? updated : v)))
+      }
       setShowEdit(false)
     } catch {
       setEditError('update failed — check the backend/R2 config')
@@ -635,7 +620,7 @@ export function GalleryPage() {
           {filtered.map((item, i) => {
             const title = feedItemTitle(item)
             const description = feedItemDescription(item)
-            const location = item.kind === 'photo' ? item.photo.location : item.kind === 'photo-group' ? item.photos[0].location : ''
+            const location = feedItemLocation(item)
             const showDayMarker = i === 0 || dayKey(item.date) !== dayKey(filtered[i - 1].date)
             return (
               <div key={`${item.kind}-${item.id}`} className="contents">
@@ -663,10 +648,8 @@ export function GalleryPage() {
                       className="max-h-[560px] w-full object-cover transition duration-700 group-hover:scale-[1.02]"
                     />
                   </button>
-                ) : item.kind === 'photo-group' ? (
-                  <PhotoGroupCarousel photos={item.photos} title={title} onOpen={(sub) => setLightbox(startIndex[i] + sub)} />
-                ) : item.kind === 'video-group' ? (
-                  <VideoGroupCarousel videos={item.videos} title={title} onOpen={(sub) => setLightbox(startIndex[i] + sub)} />
+                ) : item.kind === 'group' ? (
+                  <MediaGroupCarousel members={item.members} title={title} onOpen={(sub) => setLightbox(startIndex[i] + sub)} />
                 ) : (
                   <VideoTile video={item.video} title={title} onOpen={() => setLightbox(startIndex[i])} />
                 )}
@@ -781,7 +764,7 @@ export function GalleryPage() {
                     <span className="flex items-center gap-1.5"><MapPin size={11} className="text-cyan" />{current.photo.location}</span>
                   )}
                   <span className="flex items-center gap-1.5"><Calendar size={11} />{formatDate(current.date)}</span>
-                  {owner && current.kind === 'photo' && (
+                  {owner && (
                     <button
                       onClick={(e) => {
                         e.stopPropagation()
@@ -852,28 +835,11 @@ export function GalleryPage() {
                 </button>
               </div>
 
-              <div className="mb-4 flex gap-1 rounded-xl bg-white/5 p-1">
-                {(['photo', 'video'] as const).map((t) => (
-                  <button
-                    key={t}
-                    onClick={() => setUploadForm({ ...emptyUploadForm(), type: t })}
-                    className={clsx(
-                      'flex-1 rounded-lg py-1.5 font-mono text-xs transition',
-                      uploadForm.type === t ? 'bg-cyan/15 text-cyan ring-1 ring-cyan/40' : 'text-muted hover:text-ink',
-                    )}
-                  >
-                    {t}
-                  </button>
-                ))}
-              </div>
-
               {uploadForm.files.length > 0 ? (
                 <div className="mb-1.5 flex flex-wrap gap-2 rounded-xl bg-white/5 p-2 ring-1 ring-white/10">
                   {uploadForm.files.map((file, i) => (
                     <div key={i} className="group/tile relative size-16 shrink-0 overflow-hidden rounded-lg bg-black/40">
-                      {uploadForm.type === 'photo' ? (
-                        <img src={previewUrls[i]} alt="" className="size-full object-cover" />
-                      ) : (
+                      {file.type.startsWith('video/') ? (
                         <>
                           <video src={previewUrls[i]} muted preload="metadata" className="size-full object-cover" />
                           <div className="absolute inset-0 grid place-items-center bg-black/30">
@@ -883,6 +849,8 @@ export function GalleryPage() {
                             {file.name}
                           </span>
                         </>
+                      ) : (
+                        <img src={previewUrls[i]} alt="" className="size-full object-cover" />
                       )}
                       <button
                         type="button"
@@ -898,7 +866,7 @@ export function GalleryPage() {
                     <Plus size={16} />
                     <input
                       type="file"
-                      accept={uploadForm.type === 'photo' ? 'image/*' : 'video/*'}
+                      accept="image/*,video/*"
                       multiple
                       className="hidden"
                       onChange={(e) => setUploadForm((f) => ({ ...f, files: [...f.files, ...Array.from(e.target.files ?? [])] }))}
@@ -908,10 +876,10 @@ export function GalleryPage() {
               ) : (
                 <label className="mb-1.5 flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-white/15 px-4 py-6 text-center font-mono text-xs text-muted transition hover:border-cyan/40 hover:text-cyan">
                   <Upload size={15} />
-                  {`choose ${uploadForm.type === 'photo' ? 'photo(s)' : 'video(s)'}`}
+                  choose photos/videos
                   <input
                     type="file"
-                    accept={uploadForm.type === 'photo' ? 'image/*' : 'video/*'}
+                    accept="image/*,video/*"
                     multiple
                     className="hidden"
                     onChange={(e) => setUploadForm((f) => ({ ...f, files: Array.from(e.target.files ?? []) }))}
@@ -944,14 +912,12 @@ export function GalleryPage() {
                     <option key={c} value={c}>{c}</option>
                   ))}
                 </select>
-                {uploadForm.type === 'photo' && (
-                  <input
-                    value={uploadForm.location}
-                    onChange={(e) => setUploadForm((f) => ({ ...f, location: e.target.value }))}
-                    placeholder="location (optional)"
-                    className="min-w-0 flex-1 rounded-xl bg-white/5 px-4 py-2.5 font-mono text-sm outline-none ring-1 ring-white/10 placeholder:text-faint focus:ring-cyan/50"
-                  />
-                )}
+                <input
+                  value={uploadForm.location}
+                  onChange={(e) => setUploadForm((f) => ({ ...f, location: e.target.value }))}
+                  placeholder="location (optional)"
+                  className="min-w-0 flex-1 rounded-xl bg-white/5 px-4 py-2.5 font-mono text-sm outline-none ring-1 ring-white/10 placeholder:text-faint focus:ring-cyan/50"
+                />
               </div>
 
               {uploadError && <p className="mb-3 font-mono text-xs text-pink">{uploadError}</p>}
@@ -977,9 +943,9 @@ export function GalleryPage() {
         )}
       </AnimatePresence>
 
-      {/* ===== owner edit-photo modal ===== */}
+      {/* ===== owner edit-post modal ===== */}
       <AnimatePresence>
-        {owner && showEdit && current?.kind === 'photo' && (
+        {owner && showEdit && current && (
           <motion.div
             className="fixed inset-0 z-[90] flex items-center justify-center bg-black/90 p-4 backdrop-blur-md"
             initial={{ opacity: 0 }}
@@ -996,24 +962,33 @@ export function GalleryPage() {
               onClick={(e) => e.stopPropagation()}
             >
               <div className="mb-5 flex items-center justify-between">
-                <h3 className="font-display text-lg font-semibold">Edit photo</h3>
+                <h3 className="font-display text-lg font-semibold">{current.kind === 'photo' ? 'Edit photo' : 'Edit video'}</h3>
                 <button onClick={() => setShowEdit(false)} className="rounded-full p-1.5 text-muted transition hover:bg-white/10 hover:text-ink">
                   <X size={16} />
                 </button>
               </div>
 
               <label className="mb-3 block cursor-pointer overflow-hidden rounded-xl border border-dashed border-white/15 transition hover:border-cyan/40">
-                <img
-                  src={editPreviewUrl ?? current.photo.thumbnailUrl}
-                  alt=""
-                  className="max-h-48 w-full object-cover"
-                />
+                {current.kind === 'photo' ? (
+                  <img
+                    src={editPreviewUrl ?? current.photo.thumbnailUrl}
+                    alt=""
+                    className="max-h-48 w-full object-cover"
+                  />
+                ) : (
+                  <video
+                    src={editPreviewUrl ?? current.video.url}
+                    poster={editPreviewUrl ? undefined : current.video.thumbnailUrl}
+                    muted
+                    className="max-h-48 w-full object-cover"
+                  />
+                )}
                 <div className="flex items-center justify-center gap-2 bg-white/5 py-2 font-mono text-xs text-muted hover:text-cyan">
-                  <Upload size={13} /> replace photo (optional)
+                  <Upload size={13} /> {current.kind === 'photo' ? 'replace photo (optional)' : 'replace video (optional)'}
                 </div>
                 <input
                   type="file"
-                  accept="image/*"
+                  accept={current.kind === 'photo' ? 'image/*' : 'video/*'}
                   className="hidden"
                   onChange={(e) => setEditForm((f) => ({ ...f, file: e.target.files?.[0] ?? null }))}
                 />
@@ -1042,17 +1017,19 @@ export function GalleryPage() {
                     <option key={c} value={c}>{c}</option>
                   ))}
                 </select>
-                <input
-                  value={editForm.location}
-                  onChange={(e) => setEditForm((f) => ({ ...f, location: e.target.value }))}
-                  placeholder="location (optional)"
-                  className="min-w-0 flex-1 rounded-xl bg-white/5 px-4 py-2.5 font-mono text-sm outline-none ring-1 ring-white/10 placeholder:text-faint focus:ring-cyan/50"
-                />
+                {current.kind === 'photo' && (
+                  <input
+                    value={editForm.location}
+                    onChange={(e) => setEditForm((f) => ({ ...f, location: e.target.value }))}
+                    placeholder="location (optional)"
+                    className="min-w-0 flex-1 rounded-xl bg-white/5 px-4 py-2.5 font-mono text-sm outline-none ring-1 ring-white/10 placeholder:text-faint focus:ring-cyan/50"
+                  />
+                )}
               </div>
               <input
                 type="datetime-local"
-                value={editForm.takenAt}
-                onChange={(e) => setEditForm((f) => ({ ...f, takenAt: e.target.value }))}
+                value={editForm.date}
+                onChange={(e) => setEditForm((f) => ({ ...f, date: e.target.value }))}
                 className="mb-3 w-full rounded-xl bg-white/5 px-4 py-2.5 font-mono text-sm outline-none ring-1 ring-white/10 [color-scheme:dark] focus:ring-cyan/50"
               />
 

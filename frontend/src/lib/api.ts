@@ -120,83 +120,25 @@ export const api = {
 
   /* ---------- media uploads: owner-only, no offline fallback ---------- */
 
-  async uploadPhoto(
-    file: File,
-    meta: { title: string; description?: string; category: string; location?: string },
-    onProgress?: (percent: number) => void,
-  ): Promise<Photo> {
-    const form = new FormData()
-    form.append('file', file)
-    form.append('title', meta.title)
-    if (meta.description) form.append('description', meta.description)
-    form.append('category', meta.category)
-    if (meta.location) form.append('location', meta.location)
-    const { data } = await client.post('/media/photos/upload', form, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-      timeout: 60_000,
-      onUploadProgress: onProgress && ((e) => onProgress(e.total ? Math.round((e.loaded / e.total) * 100) : 0)),
-    })
-    return assertJsonObject<Photo>(data, 'uploadPhoto')
-  },
-
-  async uploadPhotos(
+  async uploadMedia(
     files: File[],
     meta: { title: string; description?: string; category: string; location?: string },
     onProgress?: (percent: number) => void,
-  ): Promise<Photo[]> {
+  ): Promise<{ photos: Photo[]; videos: Video[] }> {
     const form = new FormData()
     files.forEach((file) => form.append('files', file))
     form.append('title', meta.title)
     if (meta.description) form.append('description', meta.description)
     form.append('category', meta.category)
     if (meta.location) form.append('location', meta.location)
-    const { data } = await client.post('/media/photos/upload-batch', form, {
+    const { data } = await client.post('/media/upload-batch', form, {
       headers: { 'Content-Type': 'multipart/form-data' },
-      timeout: 120_000,
-      onUploadProgress: onProgress && ((e) => onProgress(e.total ? Math.round((e.loaded / e.total) * 100) : 0)),
-    })
-    if (!Array.isArray(data)) throw new Error('uploadPhotos: expected a JSON array')
-    return data as Photo[]
-  },
-
-  async uploadVideo(
-    file: File,
-    meta: { title: string; description?: string; category: string },
-    onProgress?: (percent: number) => void,
-  ): Promise<Video> {
-    const form = new FormData()
-    form.append('file', file)
-    form.append('title', meta.title)
-    if (meta.description) form.append('description', meta.description)
-    form.append('category', meta.category)
-    const { data } = await client.post('/media/videos/upload', form, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-      // server transcodes to H.264/AAC + extracts a thumbnail after the upload transfer completes,
-      // so this needs real headroom beyond just the transfer time
+      // videos in the batch get transcoded server-side after transfer, same ceiling as a video upload
       timeout: 300_000,
       onUploadProgress: onProgress && ((e) => onProgress(e.total ? Math.round((e.loaded / e.total) * 100) : 0)),
     })
-    return assertJsonObject<Video>(data, 'uploadVideo')
-  },
-
-  async uploadVideos(
-    files: File[],
-    meta: { title: string; description?: string; category: string },
-    onProgress?: (percent: number) => void,
-  ): Promise<Video[]> {
-    const form = new FormData()
-    files.forEach((file) => form.append('files', file))
-    form.append('title', meta.title)
-    if (meta.description) form.append('description', meta.description)
-    form.append('category', meta.category)
-    const { data } = await client.post('/media/videos/upload-batch', form, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-      // batch of transcoded videos — same generous ceiling as a single upload, scaled isn't needed
-      // since axios timeout resets per-request, not per-file
-      timeout: 300_000,
-      onUploadProgress: onProgress && ((e) => onProgress(e.total ? Math.round((e.loaded / e.total) * 100) : 0)),
-    })
-    return assertJsonArray<Video>(data, 'uploadVideos')
+    const result = assertJsonObject<{ photos?: Photo[]; videos?: Video[] }>(data, 'uploadMedia')
+    return { photos: result.photos ?? [], videos: result.videos ?? [] }
   },
 
   async updatePhoto(
@@ -217,6 +159,26 @@ export const api = {
       onUploadProgress: onProgress && ((e) => onProgress(e.total ? Math.round((e.loaded / e.total) * 100) : 0)),
     })
     return assertJsonObject<Photo>(data, 'updatePhoto')
+  },
+
+  async updateVideo(
+    id: number,
+    changes: { file?: File; title?: string; description?: string; category?: string; createdAt?: string },
+    onProgress?: (percent: number) => void,
+  ): Promise<Video> {
+    const form = new FormData()
+    if (changes.file) form.append('file', changes.file)
+    if (changes.title !== undefined) form.append('title', changes.title)
+    if (changes.description !== undefined) form.append('description', changes.description)
+    if (changes.category !== undefined) form.append('category', changes.category)
+    if (changes.createdAt !== undefined) form.append('createdAt', changes.createdAt)
+    const { data } = await client.put(`/media/videos/${id}`, form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      // a replacement file gets re-transcoded server-side, same ceiling as a video upload
+      timeout: 300_000,
+      onUploadProgress: onProgress && ((e) => onProgress(e.total ? Math.round((e.loaded / e.total) * 100) : 0)),
+    })
+    return assertJsonObject<Video>(data, 'updateVideo')
   },
 
   async deletePhoto(id: number): Promise<void> {

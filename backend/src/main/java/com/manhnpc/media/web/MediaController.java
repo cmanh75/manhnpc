@@ -65,21 +65,7 @@ public class MediaController {
                              @RequestParam(required = false) String description,
                              @RequestParam(defaultValue = "life") String category,
                              @RequestParam(required = false) String location) throws IOException {
-        UploadResult result = storage.upload(file, "photos");
-        Photo photo = Photo.builder()
-                .title(title)
-                .description(description)
-                .url(result.url())
-                .thumbnailUrl(result.url())
-                .storageKey(result.key())
-                .category(category)
-                .location(location)
-                .takenAt(LocalDateTime.now())
-                .width(0)
-                .height(0)
-                .featured(false)
-                .build();
-        return photos.save(photo);
+        return savePhoto(file, title, description, category, location, null, 0);
     }
 
     @PostMapping("/photos/upload-batch")
@@ -92,26 +78,57 @@ public class MediaController {
         String groupId = files.size() > 1 ? UUID.randomUUID().toString() : null;
         List<Photo> saved = new ArrayList<>();
         for (int i = 0; i < files.size(); i++) {
-            UploadResult result = storage.upload(files.get(i), "photos");
-            Photo photo = Photo.builder()
-                    .title(title)
-                    .description(description)
-                    .url(result.url())
-                    .thumbnailUrl(result.url())
-                    .storageKey(result.key())
-                    .groupId(groupId)
-                    .position(i)
-                    .category(category)
-                    .location(location)
-                    .takenAt(LocalDateTime.now())
-                    .width(0)
-                    .height(0)
-                    .featured(false)
-                    .build();
-            saved.add(photos.save(photo));
+            saved.add(savePhoto(files.get(i), title, description, category, location, groupId, i));
         }
         return saved;
     }
+
+    private Photo savePhoto(MultipartFile file, String title, String description, String category, String location,
+                             String groupId, int position) throws IOException {
+        UploadResult result = storage.upload(file, "photos");
+        Photo photo = Photo.builder()
+                .title(title)
+                .description(description)
+                .url(result.url())
+                .thumbnailUrl(result.url())
+                .storageKey(result.key())
+                .groupId(groupId)
+                .position(position)
+                .category(category)
+                .location(location)
+                .takenAt(LocalDateTime.now())
+                .width(0)
+                .height(0)
+                .featured(false)
+                .build();
+        return photos.save(photo);
+    }
+
+    /** Mixed photo+video post: one shared groupId/title/caption across whatever file types come in,
+     *  routed to the right table by content-type so a single post can carry both. */
+    @PostMapping("/upload-batch")
+    @ResponseStatus(HttpStatus.CREATED)
+    public MediaUploadResult uploadMediaBatch(@RequestParam("files") List<MultipartFile> files,
+                                              @RequestParam(defaultValue = "Untitled post") String title,
+                                              @RequestParam(required = false) String description,
+                                              @RequestParam(defaultValue = "life") String category,
+                                              @RequestParam(required = false) String location) throws IOException {
+        String groupId = files.size() > 1 ? UUID.randomUUID().toString() : null;
+        List<Photo> savedPhotos = new ArrayList<>();
+        List<Video> savedVideos = new ArrayList<>();
+        for (int i = 0; i < files.size(); i++) {
+            MultipartFile file = files.get(i);
+            String contentType = file.getContentType();
+            if (contentType != null && contentType.startsWith("video/")) {
+                savedVideos.add(processAndSaveVideo(file, title, description, category, groupId, i));
+            } else {
+                savedPhotos.add(savePhoto(file, title, description, category, location, groupId, i));
+            }
+        }
+        return new MediaUploadResult(savedPhotos, savedVideos);
+    }
+
+    public record MediaUploadResult(List<Photo> photos, List<Video> videos) {}
 
     @PostMapping("/videos/upload")
     @ResponseStatus(HttpStatus.CREATED)
@@ -197,6 +214,46 @@ public class MediaController {
             storage.delete(oldKey);
         }
         return photos.save(photo);
+    }
+
+    @PutMapping("/videos/{id}")
+    public Video updateVideo(@PathVariable Long id,
+                             @RequestParam(required = false) MultipartFile file,
+                             @RequestParam(required = false) String title,
+                             @RequestParam(required = false) String description,
+                             @RequestParam(required = false) String category,
+                             @RequestParam(required = false) String createdAt) throws IOException {
+        Video video = videos.findById(id).orElseThrow(() -> new NotFoundException("Video not found: " + id));
+        if (title != null && !title.isBlank()) video.setTitle(title);
+        if (description != null) video.setDescription(description);
+        if (category != null && !category.isBlank()) video.setCategory(category);
+        if (createdAt != null && !createdAt.isBlank()) video.setCreatedAt(LocalDateTime.parse(createdAt));
+        if (file != null && !file.isEmpty()) {
+            String oldStorageKey = video.getStorageKey();
+            String oldThumbnailKey = video.getThumbnailKey();
+            Path input = Files.createTempFile("update-", ".src");
+            ProcessedVideo processed = null;
+            try {
+                file.transferTo(input);
+                processed = videoProcessor.process(input);
+                UploadResult videoResult = storage.uploadFile(processed.video(), "video/mp4", "videos", ".mp4");
+                UploadResult thumbResult = storage.uploadFile(processed.thumbnail(), "image/jpeg", "thumbnails", ".jpg");
+                video.setUrl(videoResult.url());
+                video.setThumbnailUrl(thumbResult.url());
+                video.setStorageKey(videoResult.key());
+                video.setThumbnailKey(thumbResult.key());
+                video.setDurationSeconds(processed.durationSeconds());
+            } finally {
+                Files.deleteIfExists(input);
+                if (processed != null) {
+                    Files.deleteIfExists(processed.video());
+                    Files.deleteIfExists(processed.thumbnail());
+                }
+            }
+            storage.delete(oldStorageKey);
+            storage.delete(oldThumbnailKey);
+        }
+        return videos.save(video);
     }
 
     @DeleteMapping("/photos/{id}")
