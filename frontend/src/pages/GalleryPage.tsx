@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import { useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
@@ -206,10 +206,49 @@ function VideoTile({ video, title, onOpen }: { video: Video; title: string; onOp
   )
 }
 
+/** Click-and-drag horizontal scrolling for a snap-scroll track, for desktop mouse users —
+ *  touch/trackpad already get this for free from native scrolling, so only mouse pointers
+ *  are handled here. Suppresses the click on whatever's under the cursor once a drag moves
+ *  past a small threshold, so dragging doesn't also open the item you dragged over. */
+function useDragToScroll(trackRef: RefObject<HTMLDivElement | null>) {
+  const state = useRef({ down: false, dragged: false, startX: 0, startScroll: 0 })
+
+  function onPointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    const el = trackRef.current
+    if (!el || e.pointerType !== 'mouse') return
+    el.setPointerCapture(e.pointerId)
+    state.current = { down: true, dragged: false, startX: e.clientX, startScroll: el.scrollLeft }
+  }
+
+  function onPointerMove(e: React.PointerEvent<HTMLDivElement>) {
+    const el = trackRef.current
+    const s = state.current
+    if (!el || !s.down) return
+    const delta = e.clientX - s.startX
+    if (Math.abs(delta) > 4) s.dragged = true
+    el.scrollLeft = s.startScroll - delta
+  }
+
+  function onPointerUp() {
+    state.current.down = false
+  }
+
+  function onClickCapture(e: React.MouseEvent) {
+    if (state.current.dragged) {
+      e.preventDefault()
+      e.stopPropagation()
+      state.current.dragged = false
+    }
+  }
+
+  return { onPointerDown, onPointerMove, onPointerUp, onClickCapture }
+}
+
 /** Instagram-style swipeable carousel embedded in a feed card, with dot indicators. */
 function PhotoGroupCarousel({ photos, title, onOpen }: { photos: Photo[]; title: string; onOpen: (index: number) => void }) {
   const [active, setActive] = useState(0)
   const trackRef = useRef<HTMLDivElement>(null)
+  const drag = useDragToScroll(trackRef)
 
   function handleScroll() {
     const el = trackRef.current
@@ -223,7 +262,8 @@ function PhotoGroupCarousel({ photos, title, onOpen }: { photos: Photo[]; title:
       <div
         ref={trackRef}
         onScroll={handleScroll}
-        className="flex snap-x snap-mandatory overflow-x-auto scroll-smooth [&::-webkit-scrollbar]:hidden"
+        {...drag}
+        className="flex cursor-grab snap-x snap-mandatory overflow-x-auto scroll-smooth select-none [&::-webkit-scrollbar]:hidden active:cursor-grabbing"
         style={{ scrollbarWidth: 'none' }}
       >
         {photos.map((photo, i) => (
@@ -232,6 +272,7 @@ function PhotoGroupCarousel({ photos, title, onOpen }: { photos: Photo[]; title:
               src={photo.thumbnailUrl}
               alt={title}
               loading="lazy"
+              draggable={false}
               className="max-h-[560px] w-full object-cover"
             />
           </button>
@@ -257,6 +298,7 @@ function PhotoGroupCarousel({ photos, title, onOpen }: { photos: Photo[]; title:
 function VideoGroupCarousel({ videos, title, onOpen }: { videos: Video[]; title: string; onOpen: (index: number) => void }) {
   const [active, setActive] = useState(0)
   const trackRef = useRef<HTMLDivElement>(null)
+  const drag = useDragToScroll(trackRef)
 
   function handleScroll() {
     const el = trackRef.current
@@ -270,7 +312,8 @@ function VideoGroupCarousel({ videos, title, onOpen }: { videos: Video[]; title:
       <div
         ref={trackRef}
         onScroll={handleScroll}
-        className="flex snap-x snap-mandatory overflow-x-auto scroll-smooth [&::-webkit-scrollbar]:hidden"
+        {...drag}
+        className="flex cursor-grab snap-x snap-mandatory overflow-x-auto scroll-smooth select-none [&::-webkit-scrollbar]:hidden active:cursor-grabbing"
         style={{ scrollbarWidth: 'none' }}
       >
         {videos.map((video, i) => (
@@ -279,6 +322,7 @@ function VideoGroupCarousel({ videos, title, onOpen }: { videos: Video[]; title:
               src={video.thumbnailUrl}
               alt={title}
               loading="lazy"
+              draggable={false}
               className="size-full object-cover"
             />
             <div className="absolute inset-0 grid place-items-center bg-black/20">
