@@ -175,18 +175,19 @@ export function AboutPage() {
           </div>
           <h2 className="font-display text-2xl font-bold tracking-tight">Under the hood</h2>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted">
-            Yes, this personal site runs on six Spring Boot microservices. Yes, that's absurd. It's also my playground —
-            every pattern I want to master gets battle-tested here first.
+            Started as nine Spring Cloud microservices behind a gateway. Collapsed it into one monolith once I realized
+            none of the domains ever actually called each other over HTTP — the gateway existed purely for routing.
           </p>
           <pre className="mt-6 overflow-x-auto rounded-xl border border-white/8 bg-void/60 p-5 font-mono text-[12px] leading-relaxed text-muted">
-{`┌──────────────┐     ┌─────────────────────────────────────────┐
-│  React 19    │     │       Spring Cloud Gateway :8090        │
-│  Three.js    │ ──▶ │  ┌────────┬─────────┬────────┬────────┐ │
-│  Tailwind v4 │     │  │  auth  │ content │ media  │ travel │ │
-│  Vite 8      │     │  │ :8081  │  :8082  │ :8083  │ :8084  │ │
-└──────────────┘     │  └────────┴─────────┴────────┴────────┘ │
-                     │        Eureka Discovery :8761           │
-                     └─────────────────────────────────────────┘`}
+{`┌──────────────┐     ┌─────────────────────────────────────────────┐
+│  React 19    │     │         Spring Boot monolith :8090          │
+│  Three.js    │ ──▶ │  ┌─────────┬─────────┬─────────┬─────────┐  │
+│  Tailwind v4 │     │  │  auth   │ content │  media  │  travel │  │
+│  Vite 8      │     │  ├─────────┼─────────┼─────────┼─────────┤  │
+└──────────────┘     │  │guestbook│ journal │  audit  │ common  │  │
+                     │  └─────────┴─────────┴─────────┴─────────┘  │
+                     │          H2 (file) · Cloudflare R2          │
+                     └─────────────────────────────────────────────┘`}
           </pre>
           <div className="mt-6 flex flex-wrap gap-3">
             <Link to="/globe" className="rounded-xl bg-gradient-to-r from-cyan to-violet px-5 py-2.5 font-mono text-xs font-semibold text-void transition hover:shadow-[0_0_24px_-6px_#22d3ee]">
