@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Mail, MapPin, Briefcase, Coffee, Rocket, GitCommit, Globe2, Camera, Loader2 } from 'lucide-react'
+import { Mail, MapPin, Briefcase, Coffee, Rocket, GitCommit, Camera, Loader2 } from 'lucide-react'
 import { GithubIcon, LinkedinIcon } from '../components/ui/BrandIcons'
 import { PageShell, SectionHeading, Reveal, CountUp } from '../components/ui'
 import { api, auth } from '../lib/api'
@@ -130,11 +130,10 @@ export function AboutPage() {
       </Reveal>
 
       {/* ===== stats ===== */}
-      <div className="mb-16 grid grid-cols-2 gap-4 md:grid-cols-4">
+      <div className="mb-16 grid grid-cols-2 gap-4 md:grid-cols-3">
         {[
           { icon: <Rocket size={18} className="text-cyan" />, value: profile.stats.yearsOfExperience, suffix: '+', label: 'years of experience' },
           { icon: <GitCommit size={18} className="text-violet" />, value: profile.stats.projectsCompleted, suffix: '+', label: 'projects shipped' },
-          { icon: <Globe2 size={18} className="text-mint" />, value: profile.stats.countriesVisited, suffix: '', label: 'countries visited' },
           { icon: <Coffee size={18} className="text-amber" />, value: profile.stats.cupsOfCoffee, suffix: '+', label: 'cups of coffee' },
         ].map((stat, i) => (
           <Reveal key={stat.label} delay={i * 0.07}>
