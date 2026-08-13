@@ -223,8 +223,8 @@ export function GalleryPage() {
   const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
-    api.getPhotos().then(setPhotos)
-    api.getVideos().then(setVideos)
+    api.getPhotos().then(setPhotos).catch(() => {})
+    api.getVideos().then(setVideos).catch(() => {})
   }, [])
 
   const feed = useMemo(() => toFeed(photos, videos), [photos, videos])
@@ -260,8 +260,8 @@ export function GalleryPage() {
   const current = lightbox !== null ? viewerItems[lightbox] : null
 
   const previewUrls = useMemo(
-    () => (uploadForm.type === 'photo' ? uploadForm.files.map((f) => URL.createObjectURL(f)) : []),
-    [uploadForm.files, uploadForm.type],
+    () => uploadForm.files.map((f) => URL.createObjectURL(f)),
+    [uploadForm.files],
   )
   useEffect(() => () => previewUrls.forEach((u) => URL.revokeObjectURL(u)), [previewUrls])
 
@@ -284,8 +284,8 @@ export function GalleryPage() {
         )
         setPhotos((prev) => [...uploaded, ...prev])
       } else {
-        const video = await api.uploadVideo(
-          uploadForm.files[0],
+        const uploaded = await api.uploadVideos(
+          uploadForm.files,
           {
             title: uploadForm.title.trim(),
             description: uploadForm.description.trim() || undefined,
@@ -294,7 +294,7 @@ export function GalleryPage() {
           },
           setUploadProgress,
         )
-        setVideos((prev) => [video, ...prev])
+        setVideos((prev) => [...uploaded, ...prev])
       }
       setShowUpload(false)
       setUploadForm(emptyUploadForm())
@@ -582,50 +582,59 @@ export function GalleryPage() {
               </div>
 
               {uploadForm.files.length > 0 ? (
-                <div className="mb-3 flex flex-wrap gap-2 rounded-xl bg-white/5 p-2 ring-1 ring-white/10">
+                <div className="mb-1.5 flex flex-wrap gap-2 rounded-xl bg-white/5 p-2 ring-1 ring-white/10">
                   {uploadForm.files.map((file, i) => (
-                    <div key={i} className="relative size-16 shrink-0 overflow-hidden rounded-lg bg-black/40">
+                    <div key={i} className="group/tile relative size-16 shrink-0 overflow-hidden rounded-lg bg-black/40">
                       {uploadForm.type === 'photo' ? (
                         <img src={previewUrls[i]} alt="" className="size-full object-cover" />
                       ) : (
-                        <div className="grid size-full place-items-center px-1 text-center font-mono text-[9px] text-muted">{file.name}</div>
+                        <>
+                          <video src={previewUrls[i]} muted preload="metadata" className="size-full object-cover" />
+                          <div className="absolute inset-0 grid place-items-center bg-black/30">
+                            <Play size={14} className="text-ink" fill="currentColor" />
+                          </div>
+                          <span className="absolute inset-x-0 bottom-0 truncate bg-black/70 px-1 py-0.5 text-center font-mono text-[8px] text-faint">
+                            {file.name}
+                          </span>
+                        </>
                       )}
                       <button
                         type="button"
                         onClick={() => setUploadForm((f) => ({ ...f, files: f.files.filter((_, idx) => idx !== i) }))}
-                        className="absolute right-0.5 top-0.5 grid size-4 place-items-center rounded-full bg-black/70 text-ink"
+                        className="absolute right-0.5 top-0.5 grid size-4 place-items-center rounded-full bg-black/70 text-ink opacity-0 transition group-hover/tile:opacity-100"
                         aria-label="Remove"
                       >
                         <X size={10} />
                       </button>
                     </div>
                   ))}
-                  {uploadForm.type === 'photo' && (
-                    <label className="grid size-16 shrink-0 cursor-pointer place-items-center rounded-lg border border-dashed border-white/20 text-muted transition hover:border-cyan/40 hover:text-cyan">
-                      <Plus size={16} />
-                      <input
-                        type="file"
-                        accept="image/*"
-                        multiple
-                        className="hidden"
-                        onChange={(e) => setUploadForm((f) => ({ ...f, files: [...f.files, ...Array.from(e.target.files ?? [])] }))}
-                      />
-                    </label>
-                  )}
+                  <label className="grid size-16 shrink-0 cursor-pointer place-items-center rounded-lg border border-dashed border-white/20 text-muted transition hover:border-cyan/40 hover:text-cyan">
+                    <Plus size={16} />
+                    <input
+                      type="file"
+                      accept={uploadForm.type === 'photo' ? 'image/*' : 'video/*'}
+                      multiple
+                      className="hidden"
+                      onChange={(e) => setUploadForm((f) => ({ ...f, files: [...f.files, ...Array.from(e.target.files ?? [])] }))}
+                    />
+                  </label>
                 </div>
               ) : (
-                <label className="mb-3 flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-white/15 px-4 py-6 text-center font-mono text-xs text-muted transition hover:border-cyan/40 hover:text-cyan">
+                <label className="mb-1.5 flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-white/15 px-4 py-6 text-center font-mono text-xs text-muted transition hover:border-cyan/40 hover:text-cyan">
                   <Upload size={15} />
-                  {`choose ${uploadForm.type === 'photo' ? 'photo(s)' : 'a video'}`}
+                  {`choose ${uploadForm.type === 'photo' ? 'photo(s)' : 'video(s)'}`}
                   <input
                     type="file"
                     accept={uploadForm.type === 'photo' ? 'image/*' : 'video/*'}
-                    multiple={uploadForm.type === 'photo'}
+                    multiple
                     className="hidden"
                     onChange={(e) => setUploadForm((f) => ({ ...f, files: Array.from(e.target.files ?? []) }))}
                   />
                 </label>
               )}
+              <p className="mb-3 min-h-[1em] font-mono text-[10px] text-faint">
+                {uploadForm.files.length > 1 && `${uploadForm.files.length} files · one title/caption applies to all`}
+              </p>
 
               <input
                 value={uploadForm.title}

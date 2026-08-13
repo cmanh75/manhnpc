@@ -11,16 +11,16 @@ const typedPhrases = ['software engineer.', 'world wanderer.', 'pixel perfection
 const GlobeScene = lazy(() =>
   import('../components/globe/GlobeScene').then((module) => ({ default: module.GlobeScene })),
 )
-const initialProfile: Profile = {
-  name: 'Nguyen Phi Cuong Manh',
-  alias: 'manhnpc',
-  role: 'Junior Software Engineer',
-  company: 'Viettel Software',
-  location: 'Hanoi, Vietnam',
-  bio: 'I build software and keep the moments around it. This is my personal universe — a self-hosted home for my photos, journeys, writing, and the things I create along the way.',
-  skills: ['Java', 'Spring Boot', 'ReactJS', 'Docker', 'PostgreSQL'],
+const emptyProfile: Profile = {
+  name: '',
+  alias: '',
+  role: '',
+  company: '',
+  location: '',
+  bio: '',
+  skills: [],
   socials: {},
-  stats: { yearsOfExperience: 1, projectsCompleted: 3, countriesVisited: 9, cupsOfCoffee: 9999 },
+  stats: { yearsOfExperience: 0, projectsCompleted: 0, countriesVisited: 0, cupsOfCoffee: 0 },
 }
 
 function Typewriter() {
@@ -61,7 +61,7 @@ function Typewriter() {
 export function HomePage() {
   const [posts, setPosts] = useState<Post[]>([])
   const [photos, setPhotos] = useState<Photo[]>([])
-  const [profile, setProfile] = useState<Profile>(initialProfile)
+  const [profile, setProfile] = useState<Profile>(emptyProfile)
   const [showGlobe, setShowGlobe] = useState(false)
   // the WebGL globe runs a continuous render loop — skip it on mobile, where it's a big source of jank
   const [mobile, setMobile] = useState(() => window.matchMedia('(max-width: 767px)').matches)
@@ -87,7 +87,7 @@ export function HomePage() {
       setPhotos(nextPhotos.filter((photo) => photo.featured).slice(0, 4))
       setProfile(nextProfile)
     }
-    const timer = window.setTimeout(load, 450)
+    const timer = window.setTimeout(() => load().catch(() => {}), 450)
     return () => {
       cancelled = true
       window.clearTimeout(timer)

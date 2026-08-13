@@ -120,6 +120,24 @@ public class MediaController {
                              @RequestParam(required = false) String description,
                              @RequestParam(defaultValue = "life") String category,
                              @RequestParam(defaultValue = "0") int durationSeconds) throws IOException {
+        return processAndSaveVideo(file, title, description, category, durationSeconds);
+    }
+
+    @PostMapping("/videos/upload-batch")
+    @ResponseStatus(HttpStatus.CREATED)
+    public List<Video> uploadVideoBatch(@RequestParam("files") List<MultipartFile> files,
+                                        @RequestParam(defaultValue = "Untitled video") String title,
+                                        @RequestParam(required = false) String description,
+                                        @RequestParam(defaultValue = "life") String category,
+                                        @RequestParam(defaultValue = "0") int durationSeconds) throws IOException {
+        List<Video> saved = new ArrayList<>();
+        for (MultipartFile file : files) {
+            saved.add(processAndSaveVideo(file, title, description, category, durationSeconds));
+        }
+        return saved;
+    }
+
+    private Video processAndSaveVideo(MultipartFile file, String title, String description, String category, int durationSeconds) throws IOException {
         if (file == null || file.isEmpty()) {
             throw new IllegalArgumentException("Uploaded file is empty");
         }

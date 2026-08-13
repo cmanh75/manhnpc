@@ -5,7 +5,18 @@ import { GithubIcon, LinkedinIcon } from '../components/ui/BrandIcons'
 import { PageShell, SectionHeading, Reveal, CountUp } from '../components/ui'
 import { api } from '../lib/api'
 import type { Profile } from '../lib/types'
-import { mockProfile } from '../lib/mock'
+
+const emptyProfile: Profile = {
+  name: '',
+  alias: '',
+  role: '',
+  company: '',
+  location: '',
+  bio: '',
+  skills: [],
+  socials: {},
+  stats: { yearsOfExperience: 0, projectsCompleted: 0, countriesVisited: 0, cupsOfCoffee: 0 },
+}
 
 const timeline = [
   { year: '2019', title: 'Started at Ha Tinh High School for the Gifted', body: 'Studied mathematics and built the problem-solving foundation that led me into competitive programming and software.' },
@@ -15,7 +26,7 @@ const timeline = [
 ]
 
 export function AboutPage() {
-  const [profile, setProfile] = useState<Profile>(mockProfile)
+  const [profile, setProfile] = useState<Profile>(emptyProfile)
 
   useEffect(() => {
     api.getProfile().then(setProfile)

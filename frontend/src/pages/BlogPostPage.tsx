@@ -16,7 +16,7 @@ export function BlogPostPage() {
 
   useEffect(() => {
     window.scrollTo(0, 0)
-    if (slug) api.getPost(slug).then((p) => setPost(p ?? undefined))
+    if (slug) api.getPost(slug).then((p) => setPost(p ?? undefined)).catch(() => setPost(undefined))
   }, [slug])
 
   if (post === undefined) {

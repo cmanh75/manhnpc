@@ -87,7 +87,10 @@ export function BackendBadge() {
 
   useEffect(() => {
     let mounted = true
-    api.getProfile().then(() => mounted && setAlive(api.isBackendAlive()))
+    api
+      .getProfile()
+      .then(() => mounted && setAlive(true))
+      .catch(() => mounted && setAlive(false))
     return () => {
       mounted = false
     }
@@ -97,7 +100,7 @@ export function BackendBadge() {
   return (
     <span className="inline-flex items-center gap-1.5 rounded-full bg-white/5 px-2.5 py-1 font-mono text-[10px] text-muted ring-1 ring-white/10">
       <span className={clsx('size-1.5 rounded-full', alive ? 'bg-mint shadow-[0_0_6px_#34d399]' : 'bg-amber shadow-[0_0_6px_#fbbf24]')} />
-      {alive ? 'microservices: online' : 'offline mode: mock data'}
+      {alive ? 'microservices: online' : 'microservices: offline'}
     </span>
   )
 }

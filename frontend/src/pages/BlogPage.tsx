@@ -12,7 +12,7 @@ export function BlogPage() {
   const [tag, setTag] = useState<string | null>(null)
 
   useEffect(() => {
-    api.getPosts({ size: 50 }).then((p) => setPosts(p.content))
+    api.getPosts({ size: 50 }).then((p) => setPosts(p.content)).catch(() => {})
   }, [])
 
   const tags = useMemo(() => {

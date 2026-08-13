@@ -1,15 +1,14 @@
 import axios from 'axios'
 import type { Post, PagedPosts, Photo, Video, Profile, GuestbookEntry, JournalEntry, PagedVisits, VisitStats } from './types'
-import { mockPosts, mockPhotos, mockVideos, mockProfile } from './mock'
 import { authSession, type OwnerSession } from './auth-session'
 import { useAppStore } from '../store/useAppStore'
 export type { OwnerSession } from './auth-session'
 
 /**
- * API layer with graceful degradation:
- * every call tries the Spring Cloud gateway first (proxied via /api),
- * and silently falls back to the local mock dataset when the
- * backend is offline. The UI never knows the difference.
+ * API layer: every call goes straight to the Spring Cloud gateway
+ * (proxied via /api). There is no mock/fallback dataset — if the
+ * backend is unreachable the call throws and callers fall back to
+ * an empty/loading state instead of fabricated content.
  */
 
 const configuredApiBaseUrl = import.meta.env.VITE_API_BASE_URL as string | undefined
@@ -37,15 +36,22 @@ client.interceptors.response.use(
 /**
  * A same-origin `/api/*` call against a misconfigured deploy resolves (200 OK)
  * to Firebase Hosting's SPA fallback `index.html` instead of throwing — so an
- * unguarded write would silently accept an HTML string as if it were the
- * real payload. Call this on any response that isn't itself wrapped in
- * withFallback so a misconfiguration fails loudly instead of poisoning state.
+ * unguarded caller would silently accept an HTML string as if it were the
+ * real payload. Call this on every response so a misconfiguration fails
+ * loudly instead of poisoning state with malformed data.
  */
 function assertJsonObject<T>(data: unknown, context: string): T {
-  if (typeof data !== 'object' || data === null) {
+  if (typeof data !== 'object' || data === null || Array.isArray(data)) {
     throw new Error(`${context}: expected a JSON object, got ${typeof data}`)
   }
   return data as T
+}
+
+function assertJsonArray<T>(data: unknown, context: string): T[] {
+  if (!Array.isArray(data)) {
+    throw new Error(`${context}: expected a JSON array, got ${typeof data}`)
+  }
+  return data as T[]
 }
 
 /** The backend stores tags as a comma string — normalize to string[]. */
@@ -58,24 +64,18 @@ function normalizePost(raw: Omit<Post, 'tags'> & { tags?: string | string[] }): 
   return { ...raw, tags }
 }
 
-// Firebase Hosting rewrites unknown paths (including /api/*) to index.html.
-// Without an explicit production API URL, treat the backend as offline from
-// the start so the app uses its built-in dataset instead of accepting HTML as
-// a successful JSON response and crashing on malformed shapes.
-let backendAlive: boolean | null =
-  import.meta.env.PROD && !configuredApiBaseUrl ? false : null
+// Tracked purely for UI display (BackendBadge) — never gates whether a call
+// is made or what it returns.
+let backendAlive: boolean | null = null
 
-async function withFallback<T>(request: () => Promise<T>, fallback: T): Promise<T> {
-  if (backendAlive === false) return fallback
+async function trackedGet<T>(path: string, params?: object): Promise<T> {
   try {
-    const result = await request()
+    const { data } = await client.get(path, params ? { params } : undefined)
     backendAlive = true
-    return result
-  } catch {
+    return data as T
+  } catch (err) {
     backendAlive = false
-    // re-probe on the next page load, not every call
-    setTimeout(() => (backendAlive = null), 30_000)
-    return fallback
+    throw err
   }
 }
 
@@ -83,39 +83,33 @@ export const api = {
   isBackendAlive: () => backendAlive,
 
   async getPosts(params?: { tag?: string; q?: string; page?: number; size?: number }): Promise<PagedPosts> {
-    const fallback: PagedPosts = {
-      content: filterMockPosts(params),
-      totalElements: mockPosts.length,
-      totalPages: 1,
-      page: 0,
-    }
-    return withFallback(async () => {
-      const data = (await client.get('/posts', { params })).data
-      return { ...data, content: (data.content ?? []).map(normalizePost) }
-    }, fallback)
+    const data = assertJsonObject<Omit<PagedPosts, 'content'> & { content?: unknown[] }>(
+      await trackedGet('/posts', params),
+      'getPosts',
+    )
+    return { ...data, content: (data.content ?? []).map((p) => normalizePost(p as Parameters<typeof normalizePost>[0])) }
   },
 
   async getPost(slug: string): Promise<Post | undefined> {
-    return withFallback(
-      async () => normalizePost((await client.get(`/posts/${slug}`)).data),
-      mockPosts.find((p) => p.slug === slug),
-    )
+    try {
+      return normalizePost(assertJsonObject(await trackedGet(`/posts/${slug}`), 'getPost'))
+    } catch (err) {
+      if (axios.isAxiosError(err) && err.response?.status === 404) return undefined
+      throw err
+    }
   },
 
   async getPhotos(category?: string): Promise<Photo[]> {
-    const fallback = category && category !== 'all' ? mockPhotos.filter((p) => p.category === category) : mockPhotos
-    return withFallback(
-      async () => (await client.get('/media/photos', { params: category && category !== 'all' ? { category } : {} })).data,
-      fallback,
-    )
+    const data = await trackedGet('/media/photos', category && category !== 'all' ? { category } : {})
+    return assertJsonArray<Photo>(data, 'getPhotos')
   },
 
   async getVideos(): Promise<Video[]> {
-    return withFallback(async () => (await client.get('/media/videos')).data, mockVideos)
+    return assertJsonArray<Video>(await trackedGet('/media/videos'), 'getVideos')
   },
 
   async getProfile(): Promise<Profile> {
-    return withFallback(async () => (await client.get('/profile')).data, mockProfile)
+    return assertJsonObject<Profile>(await trackedGet('/profile'), 'getProfile')
   },
 
   /* ---------- media uploads: owner-only, no offline fallback ---------- */
@@ -180,6 +174,27 @@ export const api = {
     return assertJsonObject<Video>(data, 'uploadVideo')
   },
 
+  async uploadVideos(
+    files: File[],
+    meta: { title: string; description?: string; category: string; durationSeconds?: number },
+    onProgress?: (percent: number) => void,
+  ): Promise<Video[]> {
+    const form = new FormData()
+    files.forEach((file) => form.append('files', file))
+    form.append('title', meta.title)
+    if (meta.description) form.append('description', meta.description)
+    form.append('category', meta.category)
+    if (meta.durationSeconds) form.append('durationSeconds', String(meta.durationSeconds))
+    const { data } = await client.post('/media/videos/upload-batch', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      // batch of transcoded videos — same generous ceiling as a single upload, scaled isn't needed
+      // since axios timeout resets per-request, not per-file
+      timeout: 300_000,
+      onUploadProgress: onProgress && ((e) => onProgress(e.total ? Math.round((e.loaded / e.total) * 100) : 0)),
+    })
+    return assertJsonArray<Video>(data, 'uploadVideos')
+  },
+
   async deletePhoto(id: number): Promise<void> {
     await client.delete(`/media/photos/${id}`)
   },
@@ -187,16 +202,6 @@ export const api = {
   async deleteVideo(id: number): Promise<void> {
     await client.delete(`/media/videos/${id}`)
   },
-}
-
-function filterMockPosts(params?: { tag?: string; q?: string }): Post[] {
-  let posts = [...mockPosts].sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-  if (params?.tag) posts = posts.filter((p) => p.tags.includes(params.tag!))
-  if (params?.q) {
-    const q = params.q.toLowerCase()
-    posts = posts.filter((p) => p.title.toLowerCase().includes(q) || p.excerpt.toLowerCase().includes(q))
-  }
-  return posts
 }
 
 /* ---------- owner auth (JWT via auth-service) ---------- */
@@ -294,60 +299,18 @@ export const audit = {
   },
 }
 
-/* ---------- guestbook: backend when available, localStorage otherwise ---------- */
-
-const GUESTBOOK_KEY = 'manhnpc.guestbook'
-
-const seedGuestbook: GuestbookEntry[] = [
-  { id: 'seed-1', name: 'linh.dev', message: 'That globe is unreasonably smooth. Teach me your shader ways 🙏', emoji: '🚀', createdAt: '2026-07-20T14:12:00' },
-  { id: 'seed-2', name: 'tuan_backend', message: 'Six microservices for a personal site... respect. Absolutely unhinged. Respect.', emoji: '🔥', createdAt: '2026-07-22T09:41:00', },
-  { id: 'seed-3', name: 'a stranger from HN', message: 'Got lost spinning the Earth for ten minutes. This is what the web should feel like.', emoji: '🌏', createdAt: '2026-07-25T23:05:00' },
-]
-
-function localList(): GuestbookEntry[] {
-  try {
-    const raw = localStorage.getItem(GUESTBOOK_KEY)
-    const own: GuestbookEntry[] = raw ? JSON.parse(raw) : []
-    return [...own, ...seedGuestbook].sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-  } catch {
-    return seedGuestbook
-  }
-}
-
-function localAdd(name: string, message: string, emoji: string): GuestbookEntry {
-  const entry: GuestbookEntry = {
-    id: `gb-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-    name: name.trim() || 'anonymous traveler',
-    message: message.trim(),
-    emoji,
-    createdAt: new Date().toISOString(),
-  }
-  try {
-    const raw = localStorage.getItem(GUESTBOOK_KEY)
-    const own: GuestbookEntry[] = raw ? JSON.parse(raw) : []
-    localStorage.setItem(GUESTBOOK_KEY, JSON.stringify([entry, ...own].slice(0, 200)))
-  } catch {
-    /* storage unavailable — entry still shows for this session via state */
-  }
-  return entry
-}
+/* ---------- guestbook ---------- */
 
 export const guestbook = {
   async list(): Promise<GuestbookEntry[]> {
-    return withFallback(async () => {
-      const { data } = await client.get('/guestbook')
-      return data.map((e: GuestbookEntry & { id: number }) => ({ ...e, id: String(e.id) }))
-    }, localList())
+    const data = assertJsonArray<GuestbookEntry & { id: number }>(await trackedGet('/guestbook'), 'guestbook.list')
+    return data.map((e) => ({ ...e, id: String(e.id) }))
   },
   async add(name: string, message: string, emoji: string): Promise<GuestbookEntry> {
-    // not withFallback: localAdd has a side effect, so only run it on real failure
-    try {
-      const { data } = await client.post('/guestbook', { name, message, emoji })
-      backendAlive = true
-      return { ...data, id: String(data.id) }
-    } catch {
-      return localAdd(name, message, emoji)
-    }
+    const { data } = await client.post('/guestbook', { name, message, emoji })
+    const entry = assertJsonObject<GuestbookEntry & { id: number }>(data, 'guestbook.add')
+    backendAlive = true
+    return { ...entry, id: String(entry.id) }
   },
   /** Owner only — real backend entries have numeric ids. */
   async remove(id: string): Promise<boolean> {

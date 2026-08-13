@@ -16,24 +16,31 @@ export function GuestbookPage() {
   const [message, setMessage] = useState('')
   const [emoji, setEmoji] = useState('🌏')
   const [sent, setSent] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const owner = useAppStore((s) => s.owner)
 
   useEffect(() => {
-    guestbook.list().then((list) => {
-      setEntries(list)
-      setLoading(false)
-    })
+    guestbook
+      .list()
+      .then((list) => setEntries(list))
+      .catch(() => setError('could not reach the guestbook service'))
+      .finally(() => setLoading(false))
   }, [])
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!message.trim()) return
-    const entry = await guestbook.add(name, message, emoji)
-    setEntries((prev) => [entry, ...prev])
-    setName('')
-    setMessage('')
-    setSent(true)
-    setTimeout(() => setSent(false), 2500)
+    setError(null)
+    try {
+      const entry = await guestbook.add(name, message, emoji)
+      setEntries((prev) => [entry, ...prev])
+      setName('')
+      setMessage('')
+      setSent(true)
+      setTimeout(() => setSent(false), 2500)
+    } catch {
+      setError('could not send — try again in a moment')
+    }
   }
 
   const remove = async (id: string) => {
@@ -105,6 +112,7 @@ export function GuestbookPage() {
               </AnimatePresence>
             </button>
           </div>
+          {error && <p className="mt-3 font-mono text-xs text-pink">{error}</p>}
         </form>
       </Reveal>
 
