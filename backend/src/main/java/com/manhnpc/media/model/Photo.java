@@ -61,4 +61,7 @@ public class Photo {
 
     @Builder.Default
     private boolean featured = false;
+
+    @Builder.Default
+    private long views = 0L;
 }

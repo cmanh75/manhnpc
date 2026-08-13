@@ -256,6 +256,22 @@ public class MediaController {
         return videos.save(video);
     }
 
+    @PostMapping("/photos/{id}/view")
+    public ResponseEntity<Void> recordPhotoView(@PathVariable Long id) {
+        Photo photo = photos.findById(id).orElseThrow(() -> new NotFoundException("Photo not found: " + id));
+        photo.setViews(photo.getViews() + 1);
+        photos.save(photo);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/videos/{id}/view")
+    public ResponseEntity<Void> recordVideoView(@PathVariable Long id) {
+        Video video = videos.findById(id).orElseThrow(() -> new NotFoundException("Video not found: " + id));
+        video.setViews(video.getViews() + 1);
+        videos.save(video);
+        return ResponseEntity.noContent().build();
+    }
+
     @DeleteMapping("/photos/{id}")
     public ResponseEntity<Void> deletePhoto(@PathVariable Long id) {
         Photo photo = photos.findById(id).orElseThrow(() -> new NotFoundException("Photo not found: " + id));

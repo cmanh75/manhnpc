@@ -35,6 +35,7 @@ export interface Photo {
   width: number
   height: number
   featured: boolean
+  views: number
 }
 
 export interface Video {
@@ -48,6 +49,7 @@ export interface Video {
   durationSeconds: number
   category: string
   createdAt: string
+  views: number
 }
 
 export interface Profile {

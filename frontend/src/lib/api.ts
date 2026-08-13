@@ -188,6 +188,14 @@ export const api = {
   async deleteVideo(id: number): Promise<void> {
     await client.delete(`/media/videos/${id}`)
   },
+
+  /** Fire-and-forget view beacons — failures are silently ignored, same as audit.recordVisit. */
+  recordPhotoView(id: number) {
+    client.post(`/media/photos/${id}/view`).catch(() => {})
+  },
+  recordVideoView(id: number) {
+    client.post(`/media/videos/${id}/view`).catch(() => {})
+  },
 }
 
 /* ---------- owner auth (JWT via auth-service) ---------- */

@@ -56,4 +56,7 @@ public class Video {
     private String category;
 
     private LocalDateTime createdAt;
+
+    @Builder.Default
+    private long views = 0L;
 }

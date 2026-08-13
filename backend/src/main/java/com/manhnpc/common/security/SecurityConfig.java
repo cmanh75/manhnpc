@@ -44,6 +44,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/profile").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/posts/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/media/photos", "/api/media/videos").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/media/photos/*/view", "/api/media/videos/*/view").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/travel/locations", "/api/travel/stats").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/guestbook").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/guestbook").permitAll()
