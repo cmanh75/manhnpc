@@ -563,14 +563,14 @@ export function GalleryPage() {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.3 }}
-              className="max-h-[86vh] max-w-[90vw]"
+              className="max-h-[86svh] max-w-[90vw]"
               onClick={(e) => e.stopPropagation()}
             >
               {current.kind === 'photo' ? (
                 <img
                   src={current.photo.url}
                   alt={current.photo.title}
-                  className="max-h-[74vh] max-w-full rounded-xl object-contain shadow-2xl"
+                  className="max-h-[74svh] max-w-full rounded-xl object-contain shadow-2xl"
                 />
               ) : (
                 <video
@@ -579,7 +579,7 @@ export function GalleryPage() {
                   controls
                   autoPlay
                   playsInline
-                  className="max-h-[74vh] max-w-full rounded-xl bg-black object-contain shadow-2xl"
+                  className="max-h-[74svh] max-w-full rounded-xl bg-black object-contain shadow-2xl"
                 />
               )}
               <figcaption className="mt-4 flex flex-wrap items-center justify-between gap-3">
