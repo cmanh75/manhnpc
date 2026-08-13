@@ -153,7 +153,7 @@ export function HomePage() {
               </div>
 
               <h1 className="font-display text-5xl font-bold leading-[1.05] tracking-tight md:text-7xl">
-                Hi, I'm <span className="text-gradient">Cường Mạnh</span>
+                Hi, I'm <span className="text-gradient">manhnpc</span>
                 <span className="text-cyan">.</span>
               </h1>
 
