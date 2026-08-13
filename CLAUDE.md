@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Personal "universe" website for the owner (alias `manhnpc`): public-facing photo/video gallery, blog, guestbook and an interactive 3D globe of visited places. Visitors browse; only the owner authenticates (JWT) for writes. Two independent halves:
 
 - `frontend/` — React 19 SPA (Vite 8, TypeScript, Tailwind CSS v4, react-three-fiber, framer-motion, zustand)
-- `backend/` — Maven multi-module Spring Boot 3.3 / Spring Cloud 2023 microservices (Java 21)
+- `backend/` — single Spring Boot 3.3 monolith (Java 21, Maven)
 
 ## Commands
 
@@ -25,41 +25,44 @@ There are no frontend tests. Verification = type-check + build + loading the sit
 ### Backend (`cd backend`)
 
 ```powershell
-mvn -DskipTests package        # build all 6 services (must be BUILD SUCCESS)
-mvn -q -pl api-gateway -DskipTests package   # rebuild a single module
-.\run-all.ps1                  # start built jars in order (discovery → services → gateway)
+mvn -DskipTests package        # build the one jar (must be BUILD SUCCESS)
+.\run-all.ps1                  # start the built jar
 ```
 
-Full stack one-liner from repo root: `.\start-all.ps1` (starts backend jars + Vite + opens browser).
+Full stack one-liner from repo root: `.\start-all.ps1` (starts the backend jar + Vite + opens browser).
 
-**Windows note:** a running service holds a file lock on its jar — Maven fails to overwrite it. Kill the java process on that service's port before rebuilding (`netstat -ano | findstr :<port>` → `taskkill /F /PID <pid>`).
+**Windows note:** a running instance holds a file lock on the jar — Maven fails to overwrite it. Kill the java process on port 8090 before rebuilding (`netstat -ano | findstr :8090` → `taskkill /F /PID <pid>`).
 
 ## Machine-specific quirks (important)
 
-- **The API gateway runs on port 8090, NOT 8080** — Apache/XAMPP (`httpd`) permanently occupies 8080 on this machine. The Vite proxy, docs and scripts all assume 8090. Don't "fix" it back to 8080.
-- All services set `eureka.instance.hostname: localhost`. Without it they register under the Hyper-V hostname `cmanh75.mshome.net`, which doesn't resolve, and every gateway route times out.
-- After the gateway boots it returns 503 for ~30s until its Eureka registry sync completes. This is normal, not a bug.
+- **The backend runs on port 8090, NOT 8080** — Apache/XAMPP (`httpd`) permanently occupies 8080 on this machine. The Vite proxy, docs and scripts all assume 8090. Don't "fix" it back to 8080.
 
 ## Architecture
 
 ### Backend topology
 
+Single Spring Boot process on `:8090`, package root `com.manhnpc`. Formerly 9 separate Spring Cloud microservices (discovery-server, api-gateway, auth/content/media/travel/guestbook/journal/audit-service) behind a gateway — collapsed into one monolith to cut per-JVM RAM overhead on the VPS, since none of the domains ever called each other over HTTP (the gateway/Eureka existed purely for routing, not inter-service RPC). Domain code kept its original per-service packages, now siblings under one process:
+
 ```
-client → api-gateway :8090 (Spring Cloud Gateway, lb:// routes, CORS for :5173)
-           ├── /api/auth/**, /api/profile → auth-service   :8081  (JWT HS256, BCrypt user)
-           ├── /api/posts/**             → content-service :8082  (blog posts)
-           ├── /api/media/**             → media-service   :8083  (photos/videos; uploads go straight to Cloudflare R2, gateway never proxies file bytes)
-           ├── /api/travel/**            → travel-service  :8084  (visited places for the globe)
-           └── /api/guestbook/**         → guestbook-service :8085 (visitor guestbook)
-         discovery-server :8761 (Eureka)
+com.manhnpc
+  ├── auth/        /api/auth/**, /api/profile   — JWT HS256 issuance, BCrypt user, owner seeded from env
+  ├── content/     /api/posts/**                — blog posts
+  ├── media/       /api/media/**                — photos/videos; uploads stream straight to Cloudflare R2
+  ├── travel/      /api/travel/**                — visited places for the globe
+  ├── guestbook/   /api/guestbook/**             — visitor guestbook (POST is public)
+  ├── journal/     /api/journal/**               — private journal, owner-only on every method incl. GET
+  ├── audit/       /api/audit/**                 — visit logging (POST /visit public, reads owner-only)
+  └── common/      security (JwtService, JwtAuthFilter, SecurityConfig), web.error (ApiExceptionHandler
+                   + shared NotFoundException/BadRequestException/UnauthorizedException), storage
+                   (R2StorageService, shared by media + journal)
 ```
 
-- Every service: H2 in-memory DB, `ddl-auto: create`, seeded by a `CommandLineRunner` — data resets on every restart. Nothing is persistent except uploaded files.
-- Shared HS256 `jwt.secret` string duplicated across each service's `application.yml`. auth-service issues tokens; the other services validate writes via a lightweight `JwtWriteProtectionFilter` (OPTIONS/GET pass freely so CORS preflight works).
-- Owner credentials are supplied through environment variables. User table is `app_users` (`USER` is reserved in H2 2.x).
-- media-service uploads (`POST /api/media/photos/upload`, `/videos/upload`) stream straight to a Cloudflare R2 bucket via `R2StorageService` (AWS SDK v2 S3 client, endpoint override to `https://<account>.r2.cloudflarestorage.com`). `Photo`/`Video.url` stores the full public R2 URL and `storageKey` the R2 object key (used to delete the object on `DELETE /api/media/photos|videos/{id}`); seeded/demo rows have no `storageKey` since they point at external picsum/sample URLs. Needs `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, `R2_PUBLIC_BASE_URL` env vars — all default to empty locally so the service still boots without R2 configured (uploads just fail until set).
-- guestbook-service is the exception to the write-protection rule: POST is public (visitors sign without accounts); only DELETE/PUT/PATCH require the JWT. FE owner state lives in the zustand store (`owner`), session persisted under localStorage `manhnpc.auth`, attached to requests by an axios interceptor.
-- Consistent error shape everywhere via `@RestControllerAdvice`: `{timestamp, status, error, message, path}`.
+- One H2 DB (`ddl-auto: create` locally — data resets every restart, seeded by each domain's `DataSeeder`; prod overrides to a persistent file-backed DB with `ddl-auto: update` via env vars). Table names are namespaced per domain already (`app_users`, `posts`, `photos`/`videos`, `visited_places`, `guest_entries`, `journal_entries`, `visit_logs`) so they share one schema with no collisions. `USER` is reserved in H2 2.x, hence `app_users`.
+- Auth: `common.security.SecurityConfig` is one Spring Security filter chain (`authorizeHttpRequests`) — this is what used to be 7 independent per-service JWT filters (write-protected, guestbook's delete-only, journal's all-methods, audit's inverse-protected). Check that class for the exact path/method → access table before changing what's public vs owner-only.
+- Owner credentials come from environment variables, seeded once (`auth.config.OwnerSeeder`, only fires if the user table is empty) — changing the password via `PUT /api/auth/password` persists in the DB and is not overwritten by the env var on restart.
+- media/journal uploads stream straight to a Cloudflare R2 bucket via the shared `common.storage.R2StorageService` (AWS SDK v2 S3 client, endpoint override to `https://<account>.r2.cloudflarestorage.com`). `Photo`/`Video.url` stores the full public R2 URL and `storageKey` the R2 object key (used to delete the object on `DELETE /api/media/photos|videos/{id}`); seeded/demo rows have no `storageKey` since they point at external picsum/sample URLs. Needs `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, `R2_PUBLIC_BASE_URL` env vars — all default to empty locally so the app still boots without R2 configured (uploads just fail until set).
+- FE owner state lives in the zustand store (`owner`), session persisted under localStorage `manhnpc.auth`, attached to requests by an axios interceptor.
+- Consistent error shape everywhere via `common.web.error.ApiExceptionHandler`: `{timestamp, status, error, message, path}`.
 
 ### Frontend data layer — the load-bearing pattern
 
@@ -84,4 +87,4 @@ All theme tokens live in `src/index.css` under Tailwind v4's `@theme` (colors `v
 
 - Vite 8 (rolldown): `manualChunks` must be a function, not an object (see `vite.config.ts`).
 - `gl_PointSize` is in physical pixels — the dot shader multiplies by `gl.getPixelRatio()` each frame; dot size constants in `Earth.tsx` assume this.
-- Scripts (`start-all.ps1`, `backend/run-all.ps1`) reference jars named `<module>-1.0.0.jar`; version bumps must update them.
+- Scripts (`start-all.ps1`, `backend/run-all.ps1`, `backend/run-all.sh`) reference the jar `manhnpc-backend-1.0.0.jar`; version bumps must update them.

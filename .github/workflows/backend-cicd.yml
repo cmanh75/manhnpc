@@ -106,12 +106,20 @@ jobs:
             docker network inspect english-supporter-backend_default >/dev/null
 
             cd "$BACKEND"
+            # --remove-orphans also tears down the old per-service fleet's containers
+            # (discovery/gateway/auth/etc.) now that they're no longer in this compose
+            # file, without touching their data volumes
             docker compose -f docker-compose.prod.yml up -d --build --remove-orphans
 
-            if ! grep -q '^portfolio-api\.manhnpc\.com {' "$CADDY_REPO/Caddyfile"; then
+            # ensure the Caddyfile's reverse_proxy target points at the new single
+            # container, replacing any stale target left over from the old gateway
+            if grep -q '^portfolio-api\.manhnpc\.com {' "$CADDY_REPO/Caddyfile"; then
+              sed -i '/^portfolio-api\.manhnpc\.com {/,/^}/ s#reverse_proxy .*#reverse_proxy portfolio-app:8090#' \
+                "$CADDY_REPO/Caddyfile"
+            else
               {
                 printf '\nportfolio-api.manhnpc.com {\n'
-                printf '    reverse_proxy portfolio-api-gateway:8090\n'
+                printf '    reverse_proxy portfolio-app:8090\n'
                 printf '}\n'
               } >> "$CADDY_REPO/Caddyfile"
             fi
@@ -123,7 +131,7 @@ jobs:
             sleep 20
             docker compose -f "$BACKEND/docker-compose.prod.yml" ps
 
-            echo "--- media-service logs (last 150 lines) ---"
-            docker compose -f "$BACKEND/docker-compose.prod.yml" logs media-service --tail 150 || true
+            echo "--- app logs (last 150 lines) ---"
+            docker compose -f "$BACKEND/docker-compose.prod.yml" logs app --tail 150 || true
 
             unset JWT_SECRET OWNER_PASSWORD R2_ACCOUNT_ID R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY R2_BUCKET R2_PUBLIC_BASE_URL
