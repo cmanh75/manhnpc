@@ -332,6 +332,23 @@ export function GalleryPage() {
 
   const { viewerItems, startIndex } = useMemo(() => toViewer(filtered), [filtered])
 
+  // deep link from other pages (e.g. home's "Latest captures") — `?open=photo-123` opens that
+  // item straight in the fullscreen viewer instead of just landing on the feed list
+  useEffect(() => {
+    const open = searchParams.get('open')
+    if (!open) return
+    const [kind, idStr] = open.split('-')
+    const id = Number(idStr)
+    const index = viewerItems.findIndex((item) => item.kind === kind && item.id === id)
+    if (index === -1) return
+    setLightbox(index)
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev)
+      next.delete('open')
+      return next
+    }, { replace: true })
+  }, [viewerItems, searchParams, setSearchParams])
+
   // lock background scroll while either modal is open — otherwise scrolling/rubber-banding the
   // page behind lets mobile browser chrome collapse/expand, which reveals the fixed navbar and
   // in-flow footer through the fullscreen overlay. `overflow: hidden` on body alone doesn't stop
@@ -594,8 +611,19 @@ export function GalleryPage() {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.3 }}
-              className="max-h-[86svh] max-w-full"
+              className="max-h-[86svh] max-w-full cursor-grab active:cursor-grabbing"
               onClick={(e) => e.stopPropagation()}
+              drag="x"
+              dragConstraints={{ left: 0, right: 0 }}
+              dragElastic={0.6}
+              onDragEnd={(_, info) => {
+                const threshold = 60
+                if ((info.offset.x < -threshold || info.velocity.x < -400) && (lightbox ?? 0) < viewerItems.length - 1) {
+                  setLightbox((i) => (i === null ? null : Math.min(i + 1, viewerItems.length - 1)))
+                } else if ((info.offset.x > threshold || info.velocity.x > 400) && (lightbox ?? 0) > 0) {
+                  setLightbox((i) => (i === null ? null : Math.max(i - 1, 0)))
+                }
+              }}
             >
               {current.kind === 'photo' ? (
                 <img
