@@ -64,9 +64,9 @@ com.manhnpc
 - FE owner state lives in the zustand store (`owner`), session persisted under localStorage `manhnpc.auth`, attached to requests by an axios interceptor.
 - Consistent error shape everywhere via `common.web.error.ApiExceptionHandler`: `{timestamp, status, error, message, path}`.
 
-### Frontend data layer — the load-bearing pattern
+### Frontend data layer
 
-`src/lib/api.ts` wraps every request in `withFallback()`: try the gateway, on failure silently serve `src/lib/mock.ts` (which mirrors the backend contract 1:1) and back off re-probing for 30s. **The site must remain fully functional with the backend down.** When adding an endpoint, add the matching mock and keep both shapes in sync.
+`src/lib/api.ts` calls the backend directly (proxied via `/api`) — there is no mock/fallback dataset. If the backend is unreachable the call throws and callers fall back to an empty/loading state instead of fabricated content.
 
 Known contract mismatch handled here: content-service returns post `tags` as a comma-joined string; `normalizePost()` in api.ts converts to `string[]`. Photos/videos/places/profile match the TS types in `src/lib/types.ts` exactly.
 

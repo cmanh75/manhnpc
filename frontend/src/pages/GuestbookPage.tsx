@@ -160,7 +160,7 @@ export function GuestbookPage() {
               {owner && /^\d+$/.test(entry.id) && (
                 <button
                   onClick={() => remove(entry.id)}
-                  className="self-start rounded-lg p-2 text-faint opacity-0 transition hover:bg-pink/10 hover:text-pink group-hover:opacity-100"
+                  className="self-start rounded-lg p-2 text-faint opacity-100 transition hover:bg-pink/10 hover:text-pink md:opacity-0 md:group-hover:opacity-100"
                   aria-label="Delete entry"
                 >
                   <Trash2 size={14} />
