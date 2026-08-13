@@ -1,8 +1,9 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { AnimatePresence } from 'framer-motion'
 import { audit } from './lib/api'
 import { authSession } from './lib/auth-session'
+import { goToLogin, setNavigator } from './lib/navigation'
 import { useAppStore } from './store/useAppStore'
 import { Navbar } from './components/layout/Navbar'
 import { SmoothScroll } from './components/layout/SmoothScroll'
@@ -41,7 +42,16 @@ function DeferredEnhancements() {
   )
 }
 
-/** Logs the owner out as soon as the JWT expires, even if the tab is left open and never hits a 401. */
+/** Registers the router's navigate function so code outside React (axios interceptors) can redirect. */
+function NavigationBridge() {
+  const navigate = useNavigate()
+  useEffect(() => {
+    setNavigator((path) => navigate(path))
+  }, [navigate])
+  return null
+}
+
+/** Logs the owner out and boots them to /login as soon as the JWT expires, even if the tab is left open and never hits a 401. */
 function useSessionExpiryWatcher() {
   const owner = useAppStore((s) => s.owner)
   const setOwner = useAppStore((s) => s.setOwner)
@@ -52,6 +62,7 @@ function useSessionExpiryWatcher() {
       if (authSession.isExpired()) {
         authSession.clear()
         setOwner(null)
+        goToLogin()
       }
     }
     const interval = window.setInterval(check, 60_000)
@@ -102,6 +113,7 @@ export default function App() {
   useSessionExpiryWatcher()
   return (
     <BrowserRouter>
+      <NavigationBridge />
       <ScrollToTop />
       <SmoothScroll />
       <Backdrop />

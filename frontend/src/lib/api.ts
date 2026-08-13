@@ -1,6 +1,7 @@
 import axios from 'axios'
 import type { Post, PagedPosts, Photo, Video, Profile, GuestbookEntry, JournalEntry, PagedVisits, VisitStats } from './types'
 import { authSession, type OwnerSession } from './auth-session'
+import { goToLogin } from './navigation'
 import { useAppStore } from '../store/useAppStore'
 export type { OwnerSession } from './auth-session'
 
@@ -28,6 +29,7 @@ client.interceptors.response.use(
     if (error.response?.status === 401 && authSession.token()) {
       authSession.clear()
       useAppStore.getState().setOwner(null)
+      goToLogin()
     }
     return Promise.reject(error)
   },
