@@ -560,7 +560,7 @@ export function GalleryPage() {
             </button>
 
             <button
-              className="absolute left-3 z-10 rounded-full bg-white/10 p-3 text-ink transition hover:bg-white/20 md:left-8"
+              className="absolute left-3 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white/10 p-3 text-ink transition hover:bg-white/20 md:left-8"
               onClick={(e) => {
                 e.stopPropagation()
                 setLightbox((i) => (i === null ? null : (i - 1 + viewerItems.length) % viewerItems.length))
@@ -626,7 +626,7 @@ export function GalleryPage() {
             </motion.figure>
 
             <button
-              className="absolute right-3 z-10 rounded-full bg-white/10 p-3 text-ink transition hover:bg-white/20 md:right-8"
+              className="absolute right-3 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white/10 p-3 text-ink transition hover:bg-white/20 md:right-8"
               onClick={(e) => {
                 e.stopPropagation()
                 setLightbox((i) => (i === null ? null : (i + 1) % filtered.length))
