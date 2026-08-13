@@ -9,6 +9,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -38,6 +39,10 @@ public class AuditController {
                              List<CountEntry> visitsByDay) {
     }
 
+    /** The owner's own home/mobile network IPs — visits from these never get logged, so the
+     *  audit log only reflects actual outside traffic instead of the owner's own testing. */
+    private static final Set<String> IGNORED_IPS = Set.of("58.186.123.46", "27.68.212.237");
+
     private final VisitLogRepository visits;
 
     public AuditController(VisitLogRepository visits) {
@@ -48,10 +53,12 @@ public class AuditController {
     @PostMapping("/visit")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void recordVisit(@RequestBody(required = false) VisitRequest body, HttpServletRequest request) {
+        String ip = clientIp(request);
+        if (IGNORED_IPS.contains(ip)) return;
         String userAgent = trim(request.getHeader("User-Agent"), 500);
         UserAgentParser.Info info = UserAgentParser.parse(userAgent);
         VisitLog log = VisitLog.builder()
-                .ipAddress(trim(clientIp(request), 64))
+                .ipAddress(trim(ip, 64))
                 .userAgent(userAgent)
                 .browser(info.browser())
                 .os(info.os())
