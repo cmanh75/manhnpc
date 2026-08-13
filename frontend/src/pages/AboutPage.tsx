@@ -67,11 +67,11 @@ export function AboutPage() {
             <div className="flex flex-col items-center gap-4">
               <div className="relative">
                 <div className="absolute inset-0 animate-spin-slow rounded-full bg-[conic-gradient(from_0deg,#22d3ee,#a78bfa,#f472b6,#22d3ee)] blur-[6px]" />
-                <div className="relative grid size-28 place-items-center overflow-hidden rounded-full bg-space ring-2 ring-white/10">
+                <div className="relative grid size-36 place-items-center overflow-hidden rounded-full bg-space ring-2 ring-white/10">
                   {profile.avatarUrl ? (
                     <img src={profile.avatarUrl} alt={profile.name} className="size-full object-cover" />
                   ) : (
-                    <span className="font-display text-4xl font-bold text-gradient">M</span>
+                    <span className="font-display text-5xl font-bold text-gradient">M</span>
                   )}
                 </div>
                 {owner && (
@@ -79,11 +79,11 @@ export function AboutPage() {
                     <button
                       onClick={() => avatarInputRef.current?.click()}
                       disabled={uploadingAvatar}
-                      className="absolute bottom-0 right-0 grid size-8 place-items-center rounded-full bg-cyan text-void ring-2 ring-space transition hover:bg-cyan/80 disabled:opacity-50"
+                      className="absolute bottom-1 right-1 grid size-9 place-items-center rounded-full bg-cyan text-void ring-2 ring-space transition hover:bg-cyan/80 disabled:opacity-50"
                       aria-label="Change avatar"
                       title="Change avatar"
                     >
-                      {uploadingAvatar ? <Loader2 size={14} className="animate-spin" /> : <Camera size={14} />}
+                      {uploadingAvatar ? <Loader2 size={15} className="animate-spin" /> : <Camera size={15} />}
                     </button>
                     <input
                       ref={avatarInputRef}
