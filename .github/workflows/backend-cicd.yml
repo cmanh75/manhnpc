@@ -125,8 +125,11 @@ jobs:
             fi
 
             cd "$CADDY_REPO"
-            docker compose -f docker-compose.prod.yml exec -T caddy \
-              caddy reload --config /etc/caddy/Caddyfile
+            # `caddy reload` has been observed to keep an old upstream target live even
+            # after the Caddyfile on disk changed (a soft reload can end up comparing
+            # against a stale in-memory config and no-op). A full container restart
+            # reliably re-reads the file from scratch.
+            docker compose -f docker-compose.prod.yml restart caddy
 
             sleep 20
             docker compose -f "$BACKEND/docker-compose.prod.yml" ps
