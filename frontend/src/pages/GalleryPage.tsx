@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import { useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
-import { X, ChevronLeft, ChevronRight, MapPin, Calendar, Search, Plus, Trash2, Upload, Play, Clock, Pencil } from 'lucide-react'
+import { X, ChevronLeft, ChevronRight, MapPin, Calendar, Search, Plus, Trash2, Upload, Play, Clock, Pencil, Eye } from 'lucide-react'
 import { PageShell, SectionHeading, Reveal } from '../components/ui'
 import { api } from '../lib/api'
 import type { Photo, Video } from '../lib/types'
@@ -277,7 +277,7 @@ function MediaGroupCarousel({ members, title, onOpen }: { members: GroupMember[]
   }
 
   return (
-    <div className="relative aspect-[4/5] w-full overflow-hidden">
+    <div className="relative aspect-[4/5] w-full overflow-hidden bg-black">
       <div
         ref={trackRef}
         onScroll={handleScroll}
@@ -297,7 +297,7 @@ function MediaGroupCarousel({ members, title, onOpen }: { members: GroupMember[]
               alt={title}
               loading="lazy"
               draggable={false}
-              className="absolute inset-0 size-full object-cover"
+              className="absolute inset-0 size-full object-contain"
             />
             {member.kind === 'video' && (
               <>
@@ -430,6 +430,22 @@ export function GalleryPage() {
   }, [lightbox, viewerItems.length])
 
   const current = lightbox !== null ? viewerItems[lightbox] : null
+
+  // record a view once per item per session, reflected locally so the owner-only view count updates live
+  const viewedIdsRef = useRef<Set<string>>(new Set())
+  useEffect(() => {
+    if (!current) return
+    const key = `${current.kind}-${current.id}`
+    if (viewedIdsRef.current.has(key)) return
+    viewedIdsRef.current.add(key)
+    if (current.kind === 'photo') {
+      api.recordPhotoView(current.photo.id)
+      setPhotos((prev) => prev.map((p) => (p.id === current.photo.id ? { ...p, views: p.views + 1 } : p)))
+    } else {
+      api.recordVideoView(current.video.id)
+      setVideos((prev) => prev.map((v) => (v.id === current.video.id ? { ...v, views: v.views + 1 } : v)))
+    }
+  }, [current])
 
   const previewUrls = useMemo(
     () => uploadForm.files.map((f) => URL.createObjectURL(f)),
@@ -764,6 +780,12 @@ export function GalleryPage() {
                     <span className="flex items-center gap-1.5"><MapPin size={11} className="text-cyan" />{current.photo.location}</span>
                   )}
                   <span className="flex items-center gap-1.5"><Calendar size={11} />{formatDate(current.date)}</span>
+                  {owner && (
+                    <span className="flex items-center gap-1.5">
+                      <Eye size={11} />
+                      {current.kind === 'photo' ? current.photo.views : current.video.views} views
+                    </span>
+                  )}
                   {owner && (
                     <button
                       onClick={(e) => {
