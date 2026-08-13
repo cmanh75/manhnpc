@@ -118,9 +118,8 @@ public class MediaController {
     public Video uploadVideo(@RequestParam("file") MultipartFile file,
                              @RequestParam(defaultValue = "Untitled video") String title,
                              @RequestParam(required = false) String description,
-                             @RequestParam(defaultValue = "life") String category,
-                             @RequestParam(defaultValue = "0") int durationSeconds) throws IOException {
-        return processAndSaveVideo(file, title, description, category, durationSeconds, null, 0);
+                             @RequestParam(defaultValue = "life") String category) throws IOException {
+        return processAndSaveVideo(file, title, description, category, null, 0);
     }
 
     @PostMapping("/videos/upload-batch")
@@ -128,17 +127,16 @@ public class MediaController {
     public List<Video> uploadVideoBatch(@RequestParam("files") List<MultipartFile> files,
                                         @RequestParam(defaultValue = "Untitled video") String title,
                                         @RequestParam(required = false) String description,
-                                        @RequestParam(defaultValue = "life") String category,
-                                        @RequestParam(defaultValue = "0") int durationSeconds) throws IOException {
+                                        @RequestParam(defaultValue = "life") String category) throws IOException {
         String groupId = files.size() > 1 ? UUID.randomUUID().toString() : null;
         List<Video> saved = new ArrayList<>();
         for (int i = 0; i < files.size(); i++) {
-            saved.add(processAndSaveVideo(files.get(i), title, description, category, durationSeconds, groupId, i));
+            saved.add(processAndSaveVideo(files.get(i), title, description, category, groupId, i));
         }
         return saved;
     }
 
-    private Video processAndSaveVideo(MultipartFile file, String title, String description, String category, int durationSeconds,
+    private Video processAndSaveVideo(MultipartFile file, String title, String description, String category,
                                        String groupId, int position) throws IOException {
         if (file == null || file.isEmpty()) {
             throw new IllegalArgumentException("Uploaded file is empty");
@@ -162,7 +160,7 @@ public class MediaController {
                     .thumbnailKey(thumbResult.key())
                     .groupId(groupId)
                     .position(position)
-                    .durationSeconds(durationSeconds)
+                    .durationSeconds(processed.durationSeconds())
                     .category(category)
                     .createdAt(LocalDateTime.now())
                     .build();

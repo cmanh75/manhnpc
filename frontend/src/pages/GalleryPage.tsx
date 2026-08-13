@@ -102,7 +102,6 @@ function emptyUploadForm() {
     description: '',
     category: 'life' as (typeof uploadCategories)[number],
     location: '',
-    durationSeconds: '',
     files: [] as File[],
   }
 }
@@ -402,7 +401,6 @@ export function GalleryPage() {
             title: uploadForm.title.trim(),
             description: uploadForm.description.trim() || undefined,
             category: uploadForm.category,
-            durationSeconds: uploadForm.durationSeconds ? Number(uploadForm.durationSeconds) : undefined,
           },
           setUploadProgress,
         )
@@ -782,19 +780,11 @@ export function GalleryPage() {
                     <option key={c} value={c}>{c}</option>
                   ))}
                 </select>
-                {uploadForm.type === 'photo' ? (
+                {uploadForm.type === 'photo' && (
                   <input
                     value={uploadForm.location}
                     onChange={(e) => setUploadForm((f) => ({ ...f, location: e.target.value }))}
                     placeholder="location (optional)"
-                    className="min-w-0 flex-1 rounded-xl bg-white/5 px-4 py-2.5 font-mono text-sm outline-none ring-1 ring-white/10 placeholder:text-faint focus:ring-cyan/50"
-                  />
-                ) : (
-                  <input
-                    value={uploadForm.durationSeconds}
-                    onChange={(e) => setUploadForm((f) => ({ ...f, durationSeconds: e.target.value.replace(/\D/g, '') }))}
-                    placeholder="duration in seconds (optional)"
-                    inputMode="numeric"
                     className="min-w-0 flex-1 rounded-xl bg-white/5 px-4 py-2.5 font-mono text-sm outline-none ring-1 ring-white/10 placeholder:text-faint focus:ring-cyan/50"
                   />
                 )}

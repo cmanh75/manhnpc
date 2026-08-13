@@ -18,7 +18,7 @@ public class VideoProcessor {
 
     private static final int TIMEOUT_SECONDS = 90;
 
-    public record ProcessedVideo(Path video, Path thumbnail) {}
+    public record ProcessedVideo(Path video, Path thumbnail, int durationSeconds) {}
 
     public ProcessedVideo process(Path input) throws IOException {
         Path video = Files.createTempFile("transcoded-", ".mp4");
@@ -33,11 +33,31 @@ public class VideoProcessor {
                     "-ss", "00:00:00.5", "-vframes", "1",
                     "-vf", "scale=640:-1",
                     thumbnail.toString()));
-            return new ProcessedVideo(video, thumbnail);
+            int durationSeconds = (int) Math.round(probeDurationSeconds(video));
+            return new ProcessedVideo(video, thumbnail, durationSeconds);
         } catch (IOException | RuntimeException e) {
             Files.deleteIfExists(video);
             Files.deleteIfExists(thumbnail);
             throw e;
+        }
+    }
+
+    /** Reads the real duration off the transcoded file via ffprobe (ships alongside ffmpeg). */
+    private double probeDurationSeconds(Path video) throws IOException {
+        List<String> command = List.of("ffprobe", "-v", "error",
+                "-show_entries", "format=duration",
+                "-of", "default=noprint_wrappers=1:nokey=1",
+                video.toString());
+        Process process = new ProcessBuilder(command).start();
+        String output;
+        try (var in = process.getInputStream()) {
+            output = new String(in.readAllBytes()).trim();
+        }
+        awaitOrThrow(process, "ffprobe", command);
+        try {
+            return Double.parseDouble(output);
+        } catch (NumberFormatException e) {
+            throw new IOException("ffprobe returned unparsable duration: " + output, e);
         }
     }
 
@@ -47,19 +67,27 @@ public class VideoProcessor {
         try (var in = process.getInputStream()) {
             output = new String(in.readAllBytes());
         }
+        awaitOrThrow(process, "ffmpeg", command, output);
+    }
+
+    private void awaitOrThrow(Process process, String toolName, List<String> command) throws IOException {
+        awaitOrThrow(process, toolName, command, null);
+    }
+
+    private void awaitOrThrow(Process process, String toolName, List<String> command, String output) throws IOException {
         boolean finished;
         try {
             finished = process.waitFor(TIMEOUT_SECONDS, TimeUnit.SECONDS);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new IOException("ffmpeg interrupted", e);
+            throw new IOException(toolName + " interrupted", e);
         }
         if (!finished) {
             process.destroyForcibly();
-            throw new IOException("ffmpeg timed out after " + TIMEOUT_SECONDS + "s: " + command);
+            throw new IOException(toolName + " timed out after " + TIMEOUT_SECONDS + "s: " + command);
         }
         if (process.exitValue() != 0) {
-            throw new IOException("ffmpeg failed (exit " + process.exitValue() + "): " + output);
+            throw new IOException(toolName + " failed (exit " + process.exitValue() + "): " + (output != null ? output : ""));
         }
     }
 }

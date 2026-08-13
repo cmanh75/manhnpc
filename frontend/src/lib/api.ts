@@ -161,7 +161,7 @@ export const api = {
 
   async uploadVideo(
     file: File,
-    meta: { title: string; description?: string; category: string; durationSeconds?: number },
+    meta: { title: string; description?: string; category: string },
     onProgress?: (percent: number) => void,
   ): Promise<Video> {
     const form = new FormData()
@@ -169,7 +169,6 @@ export const api = {
     form.append('title', meta.title)
     if (meta.description) form.append('description', meta.description)
     form.append('category', meta.category)
-    if (meta.durationSeconds) form.append('durationSeconds', String(meta.durationSeconds))
     const { data } = await client.post('/media/videos/upload', form, {
       headers: { 'Content-Type': 'multipart/form-data' },
       // server transcodes to H.264/AAC + extracts a thumbnail after the upload transfer completes,
@@ -182,7 +181,7 @@ export const api = {
 
   async uploadVideos(
     files: File[],
-    meta: { title: string; description?: string; category: string; durationSeconds?: number },
+    meta: { title: string; description?: string; category: string },
     onProgress?: (percent: number) => void,
   ): Promise<Video[]> {
     const form = new FormData()
@@ -190,7 +189,6 @@ export const api = {
     form.append('title', meta.title)
     if (meta.description) form.append('description', meta.description)
     form.append('category', meta.category)
-    if (meta.durationSeconds) form.append('durationSeconds', String(meta.durationSeconds))
     const { data } = await client.post('/media/videos/upload-batch', form, {
       headers: { 'Content-Type': 'multipart/form-data' },
       // batch of transcoded videos — same generous ceiling as a single upload, scaled isn't needed
@@ -237,6 +235,19 @@ export const auth = {
   async changePassword(currentPassword: string, newPassword: string): Promise<void> {
     // deliberate direct call, no fallback — a password change is meaningless offline
     await client.put('/auth/password', { currentPassword, newPassword })
+  },
+  async uploadAvatar(file: File, onProgress?: (percent: number) => void): Promise<OwnerSession['user']> {
+    const form = new FormData()
+    form.append('file', file)
+    const { data } = await client.post('/auth/avatar', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 60_000,
+      onUploadProgress: onProgress && ((e) => onProgress(e.total ? Math.round((e.loaded / e.total) * 100) : 0)),
+    })
+    const user = assertJsonObject<OwnerSession['user']>(data, 'uploadAvatar')
+    const current = authSession.get()
+    if (current) authSession.save({ ...current, user })
+    return user
   },
 }
 
