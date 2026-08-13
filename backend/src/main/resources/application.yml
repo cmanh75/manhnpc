@@ -5,13 +5,13 @@ spring:
   application:
     name: manhnpc-backend
   datasource:
-    url: jdbc:h2:mem:appdb
+    url: jdbc:h2:file:./data/appdb;AUTO_SERVER=TRUE
     driver-class-name: org.h2.Driver
     username: sa
     password: ""
   jpa:
     hibernate:
-      ddl-auto: create
+      ddl-auto: update
     show-sql: false
   h2:
     console:
@@ -33,7 +33,6 @@ owner:
   seed:
     username: ${OWNER_USERNAME:manhnpc}
     password: ${OWNER_PASSWORD}
-    display-name: ${OWNER_DISPLAY_NAME:Nguyễn Đình Khánh}
 
 r2:
   account-id: ${R2_ACCOUNT_ID:}

@@ -10,7 +10,6 @@ services:
       CORS_ALLOWED_ORIGINS: https://manhnpc.com,https://www.manhnpc.com
       OWNER_USERNAME: ${OWNER_USERNAME:-manhnpc}
       OWNER_PASSWORD: ${OWNER_PASSWORD}
-      OWNER_DISPLAY_NAME: ${OWNER_DISPLAY_NAME:-Manh NPC}
       SPRING_DATASOURCE_URL: jdbc:h2:file:/app/data/appdb
       SPRING_JPA_HIBERNATE_DDL_AUTO: update
       SPRING_H2_CONSOLE_ENABLED: "false"

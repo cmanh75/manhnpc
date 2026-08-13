@@ -95,7 +95,6 @@ jobs:
               printf 'JWT_SECRET=%s\n' "$JWT_SECRET"
               printf 'OWNER_PASSWORD=%s\n' "$OWNER_PASSWORD"
               printf 'OWNER_USERNAME=manhnpc\n'
-              printf 'OWNER_DISPLAY_NAME=Manh NPC\n'
               printf 'R2_ACCOUNT_ID=%s\n' "$R2_ACCOUNT_ID"
               printf 'R2_ACCESS_KEY_ID=%s\n' "$R2_ACCESS_KEY_ID"
               printf 'R2_SECRET_ACCESS_KEY=%s\n' "$R2_SECRET_ACCESS_KEY"
