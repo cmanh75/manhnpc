@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, NavLink, useLocation } from 'react-router-dom'
-import { motion } from 'framer-motion'
-import { Command, LogOut, Terminal } from 'lucide-react'
+import { AnimatePresence, motion } from 'framer-motion'
+import { Command, LogOut, Menu, Terminal, X } from 'lucide-react'
 import { clsx } from '../../lib/utils'
 import { useAppStore } from '../../store/useAppStore'
 import { auth } from '../../lib/api'
@@ -17,6 +17,7 @@ const links = [
 
 export function Navbar() {
   const [scrolled, setScrolled] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
   const setPaletteOpen = useAppStore((s) => s.setPaletteOpen)
   const owner = useAppStore((s) => s.owner)
   const setOwner = useAppStore((s) => s.setOwner)
@@ -30,12 +31,17 @@ export function Navbar() {
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
+  // close the mobile menu on navigation
+  useEffect(() => {
+    setMenuOpen(false)
+  }, [location.pathname])
+
   return (
     <motion.header
       initial={{ y: -80, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1], delay: 0.1 }}
-      className="fixed inset-x-0 top-0 z-50 flex justify-center px-4 pt-4"
+      className="fixed inset-x-0 top-0 z-50 flex flex-col items-center px-4 pt-4"
     >
       <nav
         className={clsx(
@@ -112,8 +118,47 @@ export function Navbar() {
             <span className="hidden sm:inline">cmd</span>
             <kbd className="rounded bg-white/10 px-1.5 py-0.5 text-[10px]">⌘K</kbd>
           </button>
+          <button
+            onClick={() => setMenuOpen((v) => !v)}
+            className="glass grid size-8 place-items-center rounded-lg text-muted transition hover:text-ink hover:ring-1 hover:ring-cyan/40 md:hidden"
+            aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+            aria-expanded={menuOpen}
+          >
+            {menuOpen ? <X size={16} /> : <Menu size={16} />}
+          </button>
         </div>
       </nav>
+
+      <AnimatePresence>
+        {menuOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: -8, height: 0 }}
+            animate={{ opacity: 1, y: 0, height: 'auto' }}
+            exit={{ opacity: 0, y: -8, height: 0 }}
+            transition={{ duration: 0.2 }}
+            className="glass-strong mt-2 w-full max-w-5xl overflow-hidden rounded-2xl md:hidden"
+          >
+            <ul className="flex flex-col p-2">
+              {navLinks.map((link) => (
+                <li key={link.to}>
+                  <NavLink
+                    to={link.to}
+                    end={link.end}
+                    className={({ isActive }) =>
+                      clsx(
+                        'block rounded-lg px-4 py-3 font-mono text-sm transition',
+                        isActive ? 'bg-cyan/10 text-cyan' : 'text-muted hover:bg-white/5 hover:text-ink',
+                      )
+                    }
+                  >
+                    {link.label}
+                  </NavLink>
+                </li>
+              ))}
+            </ul>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.header>
   )
 }

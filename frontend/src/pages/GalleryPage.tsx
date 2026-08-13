@@ -332,15 +332,27 @@ export function GalleryPage() {
 
   const { viewerItems, startIndex } = useMemo(() => toViewer(filtered), [filtered])
 
-  // lock background scroll while either modal is open — otherwise scrolling the page behind
-  // lets mobile browser chrome collapse/expand, which reveals the fixed navbar and in-flow
-  // footer through the fullscreen overlay
+  // lock background scroll while either modal is open — otherwise scrolling/rubber-banding the
+  // page behind lets mobile browser chrome collapse/expand, which reveals the fixed navbar and
+  // in-flow footer through the fullscreen overlay. `overflow: hidden` on body alone doesn't stop
+  // touch scroll on iOS/Android, so pin body to the current scroll position with `position: fixed`.
   useEffect(() => {
     if (lightbox === null && !showUpload) return
-    const previous = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
+    const scrollY = window.scrollY
+    const body = document.body.style
+    const previous = { position: body.position, top: body.top, left: body.left, right: body.right, width: body.width }
+    body.position = 'fixed'
+    body.top = `-${scrollY}px`
+    body.left = '0'
+    body.right = '0'
+    body.width = '100%'
     return () => {
-      document.body.style.overflow = previous
+      body.position = previous.position
+      body.top = previous.top
+      body.left = previous.left
+      body.right = previous.right
+      body.width = previous.width
+      window.scrollTo(0, scrollY)
     }
   }, [lightbox, showUpload])
 
