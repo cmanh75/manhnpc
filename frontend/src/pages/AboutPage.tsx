@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
 import { Mail, MapPin, Briefcase, Coffee, Rocket, GitCommit, Camera, Loader2 } from 'lucide-react'
 import { GithubIcon, LinkedinIcon } from '../components/ui/BrandIcons'
 import { PageShell, SectionHeading, Reveal, CountUp } from '../components/ui'
@@ -166,36 +165,6 @@ export function AboutPage() {
           </Reveal>
         ))}
       </div>
-
-      {/* ===== tech behind this site ===== */}
-      <Reveal className="mt-20">
-        <div className="glass rounded-3xl p-8 md:p-10">
-          <div className="mb-4 font-mono text-[13px] text-cyan">
-            <span className="text-faint">$</span> cat ./this-site/architecture.txt
-          </div>
-          <h2 className="font-display text-2xl font-bold tracking-tight">Under the hood</h2>
-          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted">
-            Started as nine Spring Cloud microservices behind a gateway. Collapsed it into one monolith once I realized
-            none of the domains ever actually called each other over HTTP — the gateway existed purely for routing.
-          </p>
-          <pre className="mt-6 overflow-x-auto rounded-xl border border-white/8 bg-void/60 p-5 font-mono text-[12px] leading-relaxed text-muted">
-{`┌──────────────┐     ┌─────────────────────────────────────────────┐
-│  React 19    │     │         Spring Boot monolith :8090          │
-│  Three.js    │ ──▶ │  ┌─────────┬─────────┬─────────┬─────────┐  │
-│  Tailwind v4 │     │  │  auth   │ content │  media  │  travel │  │
-│  Vite 8      │     │  ├─────────┼─────────┼─────────┼─────────┤  │
-└──────────────┘     │  │guestbook│ journal │  audit  │ common  │  │
-                     │  └─────────┴─────────┴─────────┴─────────┘  │
-                     │          H2 (file) · Cloudflare R2          │
-                     └─────────────────────────────────────────────┘`}
-          </pre>
-          <div className="mt-6 flex flex-wrap gap-3">
-            <Link to="/globe" className="rounded-xl bg-gradient-to-r from-cyan to-violet px-5 py-2.5 font-mono text-xs font-semibold text-void transition hover:shadow-[0_0_24px_-6px_#22d3ee]">
-              see the globe it powers →
-            </Link>
-          </div>
-        </div>
-      </Reveal>
     </PageShell>
   )
 }
