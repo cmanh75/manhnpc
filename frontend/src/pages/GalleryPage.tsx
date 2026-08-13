@@ -276,6 +276,12 @@ function MediaGroupCarousel({ members, title, onOpen }: { members: GroupMember[]
     setActive(Math.min(members.length - 1, Math.max(0, index)))
   }
 
+  function goTo(index: number) {
+    const el = trackRef.current
+    if (!el) return
+    el.scrollTo({ left: index * el.clientWidth, behavior: 'smooth' })
+  }
+
   return (
     <div className="relative aspect-[4/5] w-full overflow-hidden bg-black">
       <div
@@ -320,6 +326,30 @@ function MediaGroupCarousel({ members, title, onOpen }: { members: GroupMember[]
           <span className="absolute right-3 top-3 rounded-md bg-black/60 px-2 py-1 font-mono text-[11px] text-ink backdrop-blur">
             {active + 1}/{members.length}
           </span>
+          {active > 0 && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                goTo(active - 1)
+              }}
+              className="absolute left-2 top-1/2 z-10 -translate-y-1/2 rounded-full bg-black/50 p-1.5 text-ink backdrop-blur transition hover:bg-black/70"
+              aria-label="Previous"
+            >
+              <ChevronLeft size={16} />
+            </button>
+          )}
+          {active < members.length - 1 && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                goTo(active + 1)
+              }}
+              className="absolute right-2 top-1/2 z-10 -translate-y-1/2 rounded-full bg-black/50 p-1.5 text-ink backdrop-blur transition hover:bg-black/70"
+              aria-label="Next"
+            >
+              <ChevronRight size={16} />
+            </button>
+          )}
           <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 gap-1.5">
             {members.map((_, i) => (
               <span key={i} className={clsx('size-1.5 rounded-full transition', i === active ? 'bg-white' : 'bg-white/40')} />
