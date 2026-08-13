@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { X, ChevronLeft, ChevronRight, MapPin, Calendar, Search, Plus, Trash2, Upload, Play, Clock } from 'lucide-react'
@@ -438,6 +439,7 @@ export function GalleryPage() {
   }
 
   return (
+    <>
     <PageShell>
       <SectionHeading
         command="tail -f ./memories.log"
@@ -552,7 +554,13 @@ export function GalleryPage() {
           <div className="py-20 text-center font-mono text-sm text-faint">// nothing here yet</div>
         </Reveal>
       )}
+    </PageShell>
 
+    {/* portalled straight to <body> — PageShell animates `y` via a persistent CSS transform,
+        which makes it the containing block for any `position: fixed` descendant, so a modal
+        nested inside it would be confined to the page's content box instead of the viewport */}
+    {createPortal(
+      <>
       {/* ===== fullscreen viewer ===== */}
       <AnimatePresence>
         {current && (
@@ -814,6 +822,9 @@ export function GalleryPage() {
           </motion.div>
         )}
       </AnimatePresence>
-    </PageShell>
+      </>,
+      document.body,
+    )}
+    </>
   )
 }
