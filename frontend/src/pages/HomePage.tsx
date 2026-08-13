@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion, useScroll, useTransform } from 'framer-motion'
-import { ArrowRight, Globe2, Image as ImageIcon, FileText, MapPin, Sparkles } from 'lucide-react'
+import { ArrowRight, ExternalLink, Globe2, Image as ImageIcon, FileText, MapPin, Sparkles } from 'lucide-react'
 import { PageShell, Reveal, CountUp, BackendBadge } from '../components/ui'
 import { TiltCard, Magnetic } from '../components/ui/Effects'
 import type { Post, Photo, Profile } from '../lib/types'
@@ -335,6 +335,16 @@ export function HomePage() {
             >
               sign the guestbook <ArrowRight size={15} />
             </Link>
+            <div>
+              <a
+                href="https://english.manhnpc.com/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-5 inline-flex items-center gap-1.5 font-mono text-xs text-muted transition hover:text-cyan"
+              >
+                also building english.manhnpc.com <ExternalLink size={11} />
+              </a>
+            </div>
           </div>
         </Reveal>
       </PageShell>
