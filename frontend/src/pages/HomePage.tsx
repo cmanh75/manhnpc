@@ -84,7 +84,7 @@ export function HomePage() {
       ])
       if (cancelled) return
       setPosts(nextPosts.content.slice(0, 3))
-      setPhotos(nextPhotos.filter((photo) => photo.featured).slice(0, 4))
+      setPhotos(nextPhotos.slice(0, 4))
       setProfile(nextProfile)
     }
     const timer = window.setTimeout(() => load().catch(() => {}), 450)
@@ -224,7 +224,7 @@ export function HomePage() {
         <Reveal>
           <div className="mb-8 flex items-end justify-between">
             <div>
-              <div className="mb-2 font-mono text-[13px] text-cyan"><span className="text-faint">$</span> ls ./memories --featured</div>
+              <div className="mb-2 font-mono text-[13px] text-cyan"><span className="text-faint">$</span> ls ./memories --recent</div>
               <h2 className="font-display text-3xl font-bold tracking-tight md:text-4xl">Latest captures</h2>
             </div>
             <Link to="/gallery" className="group hidden items-center gap-1.5 font-mono text-sm text-muted transition hover:text-cyan md:flex">
