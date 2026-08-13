@@ -34,4 +34,7 @@ public class User {
     private String displayName;
 
     private String avatarUrl;
+
+    /** R2 object key backing {@link #avatarUrl}; null for the seeded picsum placeholder. */
+    private String avatarStorageKey;
 }

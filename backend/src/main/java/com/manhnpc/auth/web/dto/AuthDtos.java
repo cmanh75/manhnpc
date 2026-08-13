@@ -32,6 +32,7 @@ public final class AuthDtos {
             String company,
             String location,
             String bio,
+            String avatarUrl,
             List<String> skills,
             Map<String, String> socials,
             Map<String, Integer> stats) {

@@ -7,17 +7,24 @@ import com.manhnpc.auth.web.dto.AuthDtos.LoginRequest;
 import com.manhnpc.auth.web.dto.AuthDtos.LoginResponse;
 import com.manhnpc.auth.web.dto.AuthDtos.UserDto;
 import com.manhnpc.common.security.JwtService;
+import com.manhnpc.common.storage.R2StorageService;
+import com.manhnpc.common.storage.R2StorageService.UploadResult;
 import com.manhnpc.common.web.error.BadRequestException;
 import com.manhnpc.common.web.error.NotFoundException;
 import com.manhnpc.common.web.error.UnauthorizedException;
+import java.io.IOException;
 import java.security.Principal;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -26,11 +33,13 @@ public class AuthController {
     private final UserRepository users;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final R2StorageService storage;
 
-    public AuthController(UserRepository users, PasswordEncoder passwordEncoder, JwtService jwtService) {
+    public AuthController(UserRepository users, PasswordEncoder passwordEncoder, JwtService jwtService, R2StorageService storage) {
         this.users = users;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
+        this.storage = storage;
     }
 
     @PostMapping("/login")
@@ -68,6 +77,23 @@ public class AuthController {
         }
         user.setPassword(passwordEncoder.encode(request.newPassword()));
         users.save(user);
+        return UserDto.from(user);
+    }
+
+    @PostMapping("/avatar")
+    @ResponseStatus(HttpStatus.CREATED)
+    public UserDto uploadAvatar(Principal principal, @RequestParam("file") MultipartFile file) throws IOException {
+        if (principal == null) {
+            throw new UnauthorizedException("Authentication required");
+        }
+        User user = users.findByUsername(principal.getName())
+                .orElseThrow(() -> new NotFoundException("User not found: " + principal.getName()));
+        UploadResult result = storage.upload(file, "avatars");
+        String previousKey = user.getAvatarStorageKey();
+        user.setAvatarUrl(result.url());
+        user.setAvatarStorageKey(result.key());
+        users.save(user);
+        storage.delete(previousKey);
         return UserDto.from(user);
     }
 }

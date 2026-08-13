@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Mail, MapPin, Briefcase, Coffee, Rocket, GitCommit, Globe2 } from 'lucide-react'
+import { Mail, MapPin, Briefcase, Coffee, Rocket, GitCommit, Globe2, Camera, Loader2 } from 'lucide-react'
 import { GithubIcon, LinkedinIcon } from '../components/ui/BrandIcons'
 import { PageShell, SectionHeading, Reveal, CountUp } from '../components/ui'
-import { api } from '../lib/api'
+import { api, auth } from '../lib/api'
 import type { Profile } from '../lib/types'
+import { useAppStore } from '../store/useAppStore'
 
 const emptyProfile: Profile = {
   name: '',
@@ -26,11 +27,29 @@ const timeline = [
 ]
 
 export function AboutPage() {
+  const owner = useAppStore((s) => s.owner)
   const [profile, setProfile] = useState<Profile>(emptyProfile)
+  const [uploadingAvatar, setUploadingAvatar] = useState(false)
+  const avatarInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     api.getProfile().then(setProfile)
   }, [])
+
+  async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    setUploadingAvatar(true)
+    try {
+      const user = await auth.uploadAvatar(file)
+      setProfile((p) => ({ ...p, avatarUrl: user.avatarUrl }))
+    } catch {
+      alert('could not update avatar')
+    } finally {
+      setUploadingAvatar(false)
+    }
+  }
 
   return (
     <PageShell>
@@ -48,9 +67,33 @@ export function AboutPage() {
             <div className="flex flex-col items-center gap-4">
               <div className="relative">
                 <div className="absolute inset-0 animate-spin-slow rounded-full bg-[conic-gradient(from_0deg,#22d3ee,#a78bfa,#f472b6,#22d3ee)] blur-[6px]" />
-                <div className="relative grid size-28 place-items-center rounded-full bg-space ring-2 ring-white/10">
-                  <span className="font-display text-4xl font-bold text-gradient">M</span>
+                <div className="relative grid size-28 place-items-center overflow-hidden rounded-full bg-space ring-2 ring-white/10">
+                  {profile.avatarUrl ? (
+                    <img src={profile.avatarUrl} alt={profile.name} className="size-full object-cover" />
+                  ) : (
+                    <span className="font-display text-4xl font-bold text-gradient">M</span>
+                  )}
                 </div>
+                {owner && (
+                  <>
+                    <button
+                      onClick={() => avatarInputRef.current?.click()}
+                      disabled={uploadingAvatar}
+                      className="absolute bottom-0 right-0 grid size-8 place-items-center rounded-full bg-cyan text-void ring-2 ring-space transition hover:bg-cyan/80 disabled:opacity-50"
+                      aria-label="Change avatar"
+                      title="Change avatar"
+                    >
+                      {uploadingAvatar ? <Loader2 size={14} className="animate-spin" /> : <Camera size={14} />}
+                    </button>
+                    <input
+                      ref={avatarInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleAvatarChange}
+                    />
+                  </>
+                )}
               </div>
               <div className="flex gap-2">
                 {profile.socials.github && (

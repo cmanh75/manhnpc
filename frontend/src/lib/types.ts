@@ -57,6 +57,7 @@ export interface Profile {
   company: string
   location: string
   bio: string
+  avatarUrl?: string
   skills: string[]
   socials: { github?: string; linkedin?: string; email?: string }
   stats: {

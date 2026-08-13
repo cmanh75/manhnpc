@@ -1,5 +1,6 @@
 package com.manhnpc.auth.web;
 
+import com.manhnpc.auth.repository.UserRepository;
 import com.manhnpc.auth.web.dto.AuthDtos.ProfileResponse;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -10,8 +11,15 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class ProfileController {
 
+    private final UserRepository users;
+
+    public ProfileController(UserRepository users) {
+        this.users = users;
+    }
+
     @GetMapping("/api/profile")
     public ProfileResponse profile() {
+        String avatarUrl = users.findAll().stream().findFirst().map(u -> u.getAvatarUrl()).orElse(null);
         Map<String, String> socials = new LinkedHashMap<>();
         socials.put("github", "https://github.com/cmanh75");
         socials.put("linkedin", "https://www.linkedin.com/in/cmanh75/");
@@ -31,6 +39,7 @@ public class ProfileController {
                 "Hanoi, Vietnam",
                 "I build software and keep the moments around it. This is my personal universe — "
                         + "a self-hosted home for my photos, journeys, writing, and the things I create along the way.",
+                avatarUrl,
                 List.of("Java", "Spring Boot", "Python", "FastAPI", "ReactJS", "WebSocket",
                         "PostgreSQL", "MariaDB", "Docker", "Git", "C", "C++"),
                 socials,
