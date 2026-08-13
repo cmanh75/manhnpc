@@ -2,11 +2,11 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { motion, useScroll, useSpring } from 'framer-motion'
 import Markdown from 'react-markdown'
-import { ArrowLeft, Clock, Calendar, Trash2 } from 'lucide-react'
+import { ArrowLeft, Clock, Eye, Calendar, Trash2 } from 'lucide-react'
 import { PageShell } from '../components/ui'
 import { api } from '../lib/api'
 import type { Post } from '../lib/types'
-import { formatDate } from '../lib/utils'
+import { formatDate, formatNumber } from '../lib/utils'
 import { useAppStore } from '../store/useAppStore'
 
 export function BlogPostPage() {
@@ -90,13 +90,16 @@ export function BlogPostPage() {
               <span className="flex items-center gap-1.5"><Calendar size={12} />{formatDate(post.createdAt)}</span>
               <span className="flex items-center gap-1.5"><Clock size={12} />{post.readingTime} min read</span>
               {owner && (
-                <button
-                  onClick={deletePost}
-                  disabled={deleting}
-                  className="flex items-center gap-1.5 text-pink transition hover:text-pink/80 disabled:opacity-40"
-                >
-                  <Trash2 size={12} /> {deleting ? 'deleting…' : 'delete'}
-                </button>
+                <>
+                  <span className="flex items-center gap-1.5"><Eye size={12} />{formatNumber(post.views)} views</span>
+                  <button
+                    onClick={deletePost}
+                    disabled={deleting}
+                    className="flex items-center gap-1.5 text-pink transition hover:text-pink/80 disabled:opacity-40"
+                  >
+                    <Trash2 size={12} /> {deleting ? 'deleting…' : 'delete'}
+                  </button>
+                </>
               )}
             </div>
           </header>
