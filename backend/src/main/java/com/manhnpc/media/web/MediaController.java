@@ -12,7 +12,6 @@ import com.manhnpc.common.web.error.NotFoundException;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -74,7 +73,7 @@ public class MediaController {
                 .storageKey(result.key())
                 .category(category)
                 .location(location)
-                .takenAt(LocalDate.now())
+                .takenAt(LocalDateTime.now())
                 .width(0)
                 .height(0)
                 .featured(false)
@@ -103,7 +102,7 @@ public class MediaController {
                     .position(i)
                     .category(category)
                     .location(location)
-                    .takenAt(LocalDate.now())
+                    .takenAt(LocalDateTime.now())
                     .width(0)
                     .height(0)
                     .featured(false)
