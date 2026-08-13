@@ -222,12 +222,12 @@ export function HomePage() {
       <PageShell wide className="pt-24">
         {/* ============ FEATURED SHOTS ============ */}
         <Reveal>
-          <div className="mb-8 flex items-end justify-between">
+          <div className="mb-8 flex flex-wrap items-end justify-between gap-y-2">
             <div>
               <div className="mb-2 font-mono text-[13px] text-cyan"><span className="text-faint">$</span> ls ./memories --recent</div>
               <h2 className="font-display text-3xl font-bold tracking-tight md:text-4xl">Latest captures</h2>
             </div>
-            <Link to="/gallery" className="group hidden items-center gap-1.5 font-mono text-sm text-muted transition hover:text-cyan md:flex">
+            <Link to="/gallery" className="group flex items-center gap-1.5 font-mono text-sm text-muted transition hover:text-cyan">
               view all <ArrowRight size={14} className="transition group-hover:translate-x-1" />
             </Link>
           </div>
@@ -263,12 +263,12 @@ export function HomePage() {
 
         {/* ============ LATEST WRITING ============ */}
         <Reveal className="mt-24">
-          <div className="mb-8 flex items-end justify-between">
+          <div className="mb-8 flex flex-wrap items-end justify-between gap-y-2">
             <div>
               <div className="mb-2 font-mono text-[13px] text-cyan"><span className="text-faint">$</span> tail -n 3 ./blog</div>
               <h2 className="font-display text-3xl font-bold tracking-tight md:text-4xl">Recent writing</h2>
             </div>
-            <Link to="/blog" className="group hidden items-center gap-1.5 font-mono text-sm text-muted transition hover:text-cyan md:flex">
+            <Link to="/blog" className="group flex items-center gap-1.5 font-mono text-sm text-muted transition hover:text-cyan">
               all posts <ArrowRight size={14} className="transition group-hover:translate-x-1" />
             </Link>
           </div>
