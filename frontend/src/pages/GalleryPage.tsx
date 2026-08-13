@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { X, ChevronLeft, ChevronRight, MapPin, Calendar, Search, Plus, Trash2, Upload, Play, Clock } from 'lucide-react'
-import { PageShell, SectionHeading, Reveal, LikeButton } from '../components/ui'
+import { PageShell, SectionHeading, Reveal } from '../components/ui'
 import { api } from '../lib/api'
 import type { Photo, Video } from '../lib/types'
 import { clsx, formatDate, formatDuration, timeAgo } from '../lib/utils'
@@ -75,6 +75,22 @@ function toViewer(feed: FeedItem[]): { viewerItems: ViewerItem[]; startIndex: nu
     }
   }
   return { viewerItems, startIndex }
+}
+
+/** Calendar-day key (local time) an item falls on, for grouping the feed into day markers. */
+function dayKey(iso: string): string {
+  const d = new Date(iso)
+  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`
+}
+
+/** Human label for a feed day marker: "Today" / "Yesterday" / full date. */
+function dayLabel(iso: string): string {
+  const key = dayKey(iso)
+  if (key === dayKey(new Date().toISOString())) return 'Today'
+  const yesterday = new Date()
+  yesterday.setDate(yesterday.getDate() - 1)
+  if (key === dayKey(yesterday.toISOString())) return 'Yesterday'
+  return new Date(iso).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
 }
 
 function feedItemTitle(item: FeedItem): string {
@@ -483,7 +499,9 @@ export function GalleryPage() {
 
       {/* category filter */}
       <div className="mx-auto mb-8 flex max-w-xl flex-wrap items-center gap-2">
-        {categories.map((cat) => (
+        {categories
+          .filter((cat) => cat === 'all' || cat === category || feed.some((f) => f.category === cat))
+          .map((cat) => (
           <button
             key={cat}
             onClick={() => setCategory(cat)}
@@ -517,9 +535,17 @@ export function GalleryPage() {
             const title = feedItemTitle(item)
             const description = feedItemDescription(item)
             const location = item.kind === 'photo' ? item.photo.location : item.kind === 'photo-group' ? item.photos[0].location : ''
+            const showDayMarker = i === 0 || dayKey(item.date) !== dayKey(filtered[i - 1].date)
             return (
+              <div key={`${item.kind}-${item.id}`} className="contents">
+              {showDayMarker && (
+                <div className={clsx('flex items-center gap-3 font-mono text-[11px] font-semibold tracking-wide text-cyan', i !== 0 && '-mb-2 mt-2')}>
+                  <span className="h-px flex-1 bg-cyan/20" />
+                  {dayLabel(item.date)}
+                  <span className="h-px flex-1 bg-cyan/20" />
+                </div>
+              )}
               <motion.article
-                key={`${item.kind}-${item.id}`}
                 layout
                 initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -554,11 +580,9 @@ export function GalleryPage() {
                   </div>
                   <h3 className="mt-2 font-display text-lg font-semibold leading-snug tracking-tight">{title}</h3>
                   {description && <p className="mt-1 text-sm leading-relaxed text-muted">{description}</p>}
-                  <div className="mt-3">
-                    <LikeButton likeKey={`${item.kind}-${item.id}`} />
-                  </div>
                 </div>
               </motion.article>
+              </div>
             )
           })}
         </AnimatePresence>
@@ -667,7 +691,6 @@ export function GalleryPage() {
                       <Trash2 size={11} /> {deleting ? 'deleting…' : 'delete'}
                     </button>
                   )}
-                  <LikeButton likeKey={`${current.kind}-${current.id}`} />
                 </div>
               </figcaption>
             </motion.figure>

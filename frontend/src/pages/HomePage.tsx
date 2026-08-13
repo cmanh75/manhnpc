@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion, useScroll, useTransform } from 'framer-motion'
-import { ArrowRight, ExternalLink, GraduationCap, Globe2, Image as ImageIcon, FileText, MapPin, Sparkles } from 'lucide-react'
+import { ArrowRight, ExternalLink, GraduationCap, Image as ImageIcon, FileText, MapPin, Sparkles } from 'lucide-react'
 import { PageShell, Reveal, BackendBadge } from '../components/ui'
 import { TiltCard, Magnetic } from '../components/ui/Effects'
 import type { Post, Photo, Profile } from '../lib/types'
@@ -166,16 +166,6 @@ export function HomePage() {
               </p>
 
               <div className="mt-8 flex flex-wrap items-center gap-4">
-                <Magnetic>
-                  <Link
-                    to="/globe"
-                    className="group inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-cyan to-violet px-5 py-3 font-mono text-sm font-semibold text-void transition hover:shadow-[0_0_32px_-6px_#22d3ee]"
-                  >
-                    <Globe2 size={16} />
-                    explore my planet
-                    <ArrowRight size={15} className="transition group-hover:translate-x-1" />
-                  </Link>
-                </Magnetic>
                 <Magnetic>
                   <Link
                     to="/about"
