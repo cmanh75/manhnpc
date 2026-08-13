@@ -15,33 +15,44 @@ type FeedItem =
   | { kind: 'photo'; id: number; date: string; category: string; photo: Photo }
   | { kind: 'photo-group'; id: number; date: string; category: string; photos: Photo[] }
   | { kind: 'video'; id: number; date: string; category: string; video: Video }
+  | { kind: 'video-group'; id: number; date: string; category: string; videos: Video[] }
 
 /** One entry per individually viewable photo/video, in feed order — what the fullscreen viewer navigates. */
 type ViewerItem =
   | { kind: 'photo'; id: number; date: string; photo: Photo }
   | { kind: 'video'; id: number; date: string; video: Video }
 
-function toFeed(photos: Photo[], videos: Video[]): FeedItem[] {
-  const standalone: Photo[] = []
-  const groups = new Map<string, Photo[]>()
-  for (const photo of photos) {
-    if (photo.groupId) {
-      const group = groups.get(photo.groupId) ?? []
-      group.push(photo)
-      groups.set(photo.groupId, group)
+/** Groups items sharing a groupId together (sorted by position), keeping ungrouped items standalone. */
+function groupByGroupId<T extends { groupId?: string | null; position?: number }>(items: T[]): { standalone: T[]; groups: T[][] } {
+  const standalone: T[] = []
+  const groups = new Map<string, T[]>()
+  for (const item of items) {
+    if (item.groupId) {
+      const group = groups.get(item.groupId) ?? []
+      group.push(item)
+      groups.set(item.groupId, group)
     } else {
-      standalone.push(photo)
+      standalone.push(item)
     }
   }
+  return { standalone, groups: [...groups.values()].map((g) => [...g].sort((a, b) => (a.position ?? 0) - (b.position ?? 0))) }
+}
+
+function toFeed(photos: Photo[], videos: Video[]): FeedItem[] {
+  const photoGrouped = groupByGroupId(photos)
+  const videoGrouped = groupByGroupId(videos)
 
   const items: FeedItem[] = [
-    ...standalone.map((photo): FeedItem => ({ kind: 'photo', id: photo.id, date: photo.takenAt, category: photo.category, photo })),
-    ...[...groups.values()].map((group): FeedItem => {
-      const sorted = [...group].sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
-      const first = sorted[0]
-      return { kind: 'photo-group', id: first.id, date: first.takenAt, category: first.category, photos: sorted }
+    ...photoGrouped.standalone.map((photo): FeedItem => ({ kind: 'photo', id: photo.id, date: photo.takenAt, category: photo.category, photo })),
+    ...photoGrouped.groups.map((group): FeedItem => {
+      const first = group[0]
+      return { kind: 'photo-group', id: first.id, date: first.takenAt, category: first.category, photos: group }
     }),
-    ...videos.map((video): FeedItem => ({ kind: 'video', id: video.id, date: video.createdAt, category: video.category, video })),
+    ...videoGrouped.standalone.map((video): FeedItem => ({ kind: 'video', id: video.id, date: video.createdAt, category: video.category, video })),
+    ...videoGrouped.groups.map((group): FeedItem => {
+      const first = group[0]
+      return { kind: 'video-group', id: first.id, date: first.createdAt, category: first.category, videos: group }
+    }),
   ]
   return items.sort((a, b) => b.date.localeCompare(a.date))
 }
@@ -56,11 +67,31 @@ function toViewer(feed: FeedItem[]): { viewerItems: ViewerItem[]; startIndex: nu
       viewerItems.push({ kind: 'photo', id: item.photo.id, date: item.photo.takenAt, photo: item.photo })
     } else if (item.kind === 'photo-group') {
       for (const photo of item.photos) viewerItems.push({ kind: 'photo', id: photo.id, date: photo.takenAt, photo })
-    } else {
+    } else if (item.kind === 'video') {
       viewerItems.push({ kind: 'video', id: item.video.id, date: item.video.createdAt, video: item.video })
+    } else {
+      for (const video of item.videos) viewerItems.push({ kind: 'video', id: video.id, date: video.createdAt, video })
     }
   }
   return { viewerItems, startIndex }
+}
+
+function feedItemTitle(item: FeedItem): string {
+  switch (item.kind) {
+    case 'video': return item.video.title
+    case 'photo': return item.photo.title
+    case 'photo-group': return item.photos[0].title
+    case 'video-group': return item.videos[0].title
+  }
+}
+
+function feedItemDescription(item: FeedItem): string {
+  switch (item.kind) {
+    case 'video': return item.video.description
+    case 'photo': return item.photo.description
+    case 'photo-group': return item.photos[0].description
+    case 'video-group': return item.videos[0].description
+  }
 }
 
 function emptyUploadForm() {
@@ -206,6 +237,62 @@ function PhotoGroupCarousel({ photos, title, onOpen }: { photos: Photo[]; title:
   )
 }
 
+/** Instagram-style swipeable carousel embedded in a feed card, for a multi-video post. */
+function VideoGroupCarousel({ videos, title, onOpen }: { videos: Video[]; title: string; onOpen: (index: number) => void }) {
+  const [active, setActive] = useState(0)
+  const trackRef = useRef<HTMLDivElement>(null)
+
+  function handleScroll() {
+    const el = trackRef.current
+    if (!el) return
+    const index = Math.round(el.scrollLeft / el.clientWidth)
+    setActive(Math.min(videos.length - 1, Math.max(0, index)))
+  }
+
+  return (
+    <div className="relative">
+      <div
+        ref={trackRef}
+        onScroll={handleScroll}
+        className="flex snap-x snap-mandatory overflow-x-auto scroll-smooth [&::-webkit-scrollbar]:hidden"
+        style={{ scrollbarWidth: 'none' }}
+      >
+        {videos.map((video, i) => (
+          <button key={video.id} onClick={() => onOpen(i)} className="relative block aspect-video w-full flex-none snap-center" data-cursor="pointer">
+            <img
+              src={video.thumbnailUrl}
+              alt={title}
+              loading="lazy"
+              className="size-full object-cover"
+            />
+            <div className="absolute inset-0 grid place-items-center bg-black/20">
+              <span className="grid size-14 place-items-center rounded-full bg-black/45 ring-1 ring-white/25 backdrop-blur">
+                <Play size={20} className="ml-1 text-ink" fill="currentColor" />
+              </span>
+            </div>
+            <span className="absolute bottom-3 right-3 flex items-center gap-1.5 rounded-md bg-black/60 px-2 py-1 font-mono text-[11px] text-ink backdrop-blur">
+              <Clock size={10} />
+              {formatDuration(video.durationSeconds)}
+            </span>
+          </button>
+        ))}
+      </div>
+      {videos.length > 1 && (
+        <>
+          <span className="absolute right-3 top-3 rounded-md bg-black/60 px-2 py-1 font-mono text-[11px] text-ink backdrop-blur">
+            {active + 1}/{videos.length}
+          </span>
+          <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 gap-1.5">
+            {videos.map((_, i) => (
+              <span key={i} className={clsx('size-1.5 rounded-full transition', i === active ? 'bg-white' : 'bg-white/40')} />
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 export function GalleryPage() {
   const owner = useAppStore((s) => s.owner)
   const [photos, setPhotos] = useState<Photo[]>([])
@@ -234,8 +321,8 @@ export function GalleryPage() {
     if (query.trim()) {
       const q = query.toLowerCase()
       list = list.filter((item) => {
-        const title = item.kind === 'video' ? item.video.title : item.kind === 'photo' ? item.photo.title : item.photos[0].title
-        const description = item.kind === 'video' ? item.video.description : item.kind === 'photo' ? item.photo.description : item.photos[0].description
+        const title = feedItemTitle(item)
+        const description = feedItemDescription(item)
         const location = item.kind === 'photo' ? item.photo.location : item.kind === 'photo-group' ? item.photos[0].location : ''
         return title.toLowerCase().includes(q) || description.toLowerCase().includes(q) || location.toLowerCase().includes(q)
       })
@@ -386,8 +473,8 @@ export function GalleryPage() {
       <div className="mx-auto flex max-w-xl flex-col gap-6">
         <AnimatePresence mode="popLayout">
           {filtered.map((item, i) => {
-            const title = item.kind === 'video' ? item.video.title : item.kind === 'photo' ? item.photo.title : item.photos[0].title
-            const description = item.kind === 'video' ? item.video.description : item.kind === 'photo' ? item.photo.description : item.photos[0].description
+            const title = feedItemTitle(item)
+            const description = feedItemDescription(item)
             const location = item.kind === 'photo' ? item.photo.location : item.kind === 'photo-group' ? item.photos[0].location : ''
             return (
               <motion.article
@@ -410,6 +497,8 @@ export function GalleryPage() {
                   </button>
                 ) : item.kind === 'photo-group' ? (
                   <PhotoGroupCarousel photos={item.photos} title={title} onOpen={(sub) => setLightbox(startIndex[i] + sub)} />
+                ) : item.kind === 'video-group' ? (
+                  <VideoGroupCarousel videos={item.videos} title={title} onOpen={(sub) => setLightbox(startIndex[i] + sub)} />
                 ) : (
                   <VideoTile video={item.video} title={title} onOpen={() => setLightbox(startIndex[i])} />
                 )}
@@ -489,6 +578,7 @@ export function GalleryPage() {
                   poster={current.video.thumbnailUrl}
                   controls
                   autoPlay
+                  playsInline
                   className="max-h-[74vh] max-w-full rounded-xl bg-black object-contain shadow-2xl"
                 />
               )}
@@ -601,10 +691,10 @@ export function GalleryPage() {
                       <button
                         type="button"
                         onClick={() => setUploadForm((f) => ({ ...f, files: f.files.filter((_, idx) => idx !== i) }))}
-                        className="absolute right-0.5 top-0.5 grid size-4 place-items-center rounded-full bg-black/70 text-ink opacity-0 transition group-hover/tile:opacity-100"
+                        className="absolute right-0.5 top-0.5 grid size-5 place-items-center rounded-full bg-black/70 text-ink opacity-100 transition md:opacity-0 md:group-hover/tile:opacity-100"
                         aria-label="Remove"
                       >
-                        <X size={10} />
+                        <X size={11} />
                       </button>
                     </div>
                   ))}

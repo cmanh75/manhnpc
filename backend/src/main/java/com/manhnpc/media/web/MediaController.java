@@ -120,7 +120,7 @@ public class MediaController {
                              @RequestParam(required = false) String description,
                              @RequestParam(defaultValue = "life") String category,
                              @RequestParam(defaultValue = "0") int durationSeconds) throws IOException {
-        return processAndSaveVideo(file, title, description, category, durationSeconds);
+        return processAndSaveVideo(file, title, description, category, durationSeconds, null, 0);
     }
 
     @PostMapping("/videos/upload-batch")
@@ -130,14 +130,16 @@ public class MediaController {
                                         @RequestParam(required = false) String description,
                                         @RequestParam(defaultValue = "life") String category,
                                         @RequestParam(defaultValue = "0") int durationSeconds) throws IOException {
+        String groupId = files.size() > 1 ? UUID.randomUUID().toString() : null;
         List<Video> saved = new ArrayList<>();
-        for (MultipartFile file : files) {
-            saved.add(processAndSaveVideo(file, title, description, category, durationSeconds));
+        for (int i = 0; i < files.size(); i++) {
+            saved.add(processAndSaveVideo(files.get(i), title, description, category, durationSeconds, groupId, i));
         }
         return saved;
     }
 
-    private Video processAndSaveVideo(MultipartFile file, String title, String description, String category, int durationSeconds) throws IOException {
+    private Video processAndSaveVideo(MultipartFile file, String title, String description, String category, int durationSeconds,
+                                       String groupId, int position) throws IOException {
         if (file == null || file.isEmpty()) {
             throw new IllegalArgumentException("Uploaded file is empty");
         }
@@ -158,6 +160,8 @@ public class MediaController {
                     .thumbnailUrl(thumbResult.url())
                     .storageKey(videoResult.key())
                     .thumbnailKey(thumbResult.key())
+                    .groupId(groupId)
+                    .position(position)
                     .durationSeconds(durationSeconds)
                     .category(category)
                     .createdAt(LocalDateTime.now())

@@ -43,6 +43,8 @@ export interface Video {
   description: string
   url: string
   thumbnailUrl: string
+  groupId?: string | null
+  position?: number
   durationSeconds: number
   category: string
   createdAt: string

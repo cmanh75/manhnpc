@@ -43,6 +43,14 @@ public class Video {
     /** R2 object key backing {@link #thumbnailUrl}; null for seeded/picsum thumbnails. */
     private String thumbnailKey;
 
+    /** Shared by every video in the same multi-video post; null for standalone videos. */
+    private String groupId;
+
+    /** Order within {@link #groupId}; null/0 for standalone videos or rows predating this column. */
+    @Column(name = "sort_position")
+    @Builder.Default
+    private Integer position = 0;
+
     private int durationSeconds;
 
     private String category;
