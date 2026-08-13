@@ -332,6 +332,18 @@ export function GalleryPage() {
 
   const { viewerItems, startIndex } = useMemo(() => toViewer(filtered), [filtered])
 
+  // lock background scroll while either modal is open — otherwise scrolling the page behind
+  // lets mobile browser chrome collapse/expand, which reveals the fixed navbar and in-flow
+  // footer through the fullscreen overlay
+  useEffect(() => {
+    if (lightbox === null && !showUpload) return
+    const previous = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = previous
+    }
+  }, [lightbox, showUpload])
+
   // keyboard navigation for the fullscreen viewer
   useEffect(() => {
     if (lightbox === null) return
