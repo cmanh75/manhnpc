@@ -545,7 +545,7 @@ export function GalleryPage() {
       <AnimatePresence>
         {current && (
           <motion.div
-            className="fixed inset-0 z-[80] flex items-center justify-center bg-black/90 backdrop-blur-md"
+            className="fixed inset-0 z-[80] flex items-center justify-center bg-black/90 px-16 backdrop-blur-md md:px-24"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -575,7 +575,7 @@ export function GalleryPage() {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.3 }}
-              className="max-h-[86svh] max-w-[90vw]"
+              className="max-h-[86svh] max-w-full"
               onClick={(e) => e.stopPropagation()}
             >
               {current.kind === 'photo' ? (

@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion, useScroll, useTransform } from 'framer-motion'
-import { ArrowRight, ExternalLink, Globe2, Image as ImageIcon, FileText, MapPin, Sparkles } from 'lucide-react'
+import { ArrowRight, ExternalLink, GraduationCap, Globe2, Image as ImageIcon, FileText, MapPin, Sparkles } from 'lucide-react'
 import { PageShell, Reveal, CountUp, BackendBadge } from '../components/ui'
 import { TiltCard, Magnetic } from '../components/ui/Effects'
 import type { Post, Photo, Profile } from '../lib/types'
@@ -314,8 +314,41 @@ export function HomePage() {
           ))}
         </div>
 
-        {/* ============ CTA ============ */}
+        {/* ============ SIDE PROJECT ============ */}
         <Reveal className="mt-24">
+          <a
+            href="https://english.manhnpc.com/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="border-beam glass group relative flex flex-col items-start gap-6 overflow-hidden rounded-3xl p-8 transition hover:bg-white/[0.04] sm:flex-row sm:items-center sm:justify-between md:p-10"
+          >
+            <div
+              className="pointer-events-none absolute -right-20 -top-20 size-72 rounded-full opacity-20 blur-[100px] transition-opacity duration-500 group-hover:opacity-30"
+              style={{ background: 'radial-gradient(circle, #34d399, transparent 70%)' }}
+            />
+            <div className="relative flex items-start gap-4">
+              <span className="grid size-12 shrink-0 place-items-center rounded-xl bg-mint/10 ring-1 ring-mint/30">
+                <GraduationCap size={20} className="text-mint" />
+              </span>
+              <div>
+                <div className="font-mono text-[11px] text-mint">
+                  <span className="text-faint">$</span> also-shipping --side-project
+                </div>
+                <h3 className="mt-1.5 font-display text-xl font-bold tracking-tight md:text-2xl">english.manhnpc.com</h3>
+                <p className="mt-1.5 max-w-md text-sm leading-relaxed text-muted">
+                  An English-learning companion I'm building on the side — same late-night energy as this place.
+                </p>
+              </div>
+            </div>
+            <span className="relative inline-flex shrink-0 items-center gap-2 self-start rounded-xl bg-mint/10 px-5 py-2.5 font-mono text-sm text-mint ring-1 ring-mint/30 transition group-hover:bg-mint/20 group-hover:ring-mint/60 sm:self-center">
+              visit site
+              <ExternalLink size={14} className="transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+            </span>
+          </a>
+        </Reveal>
+
+        {/* ============ CTA ============ */}
+        <Reveal className="mt-8">
           <div className="border-beam glass relative overflow-hidden rounded-3xl p-10 text-center md:p-16">
             <div
               className="pointer-events-none absolute -top-24 left-1/2 size-96 -translate-x-1/2 rounded-full opacity-25 blur-[100px]"
@@ -335,16 +368,6 @@ export function HomePage() {
             >
               sign the guestbook <ArrowRight size={15} />
             </Link>
-            <div>
-              <a
-                href="https://english.manhnpc.com/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-5 inline-flex items-center gap-1.5 font-mono text-xs text-muted transition hover:text-cyan"
-              >
-                also building english.manhnpc.com <ExternalLink size={11} />
-              </a>
-            </div>
           </div>
         </Reveal>
       </PageShell>
