@@ -660,7 +660,7 @@ export function GalleryPage() {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 16 }}
               transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-              className="glass w-full max-w-md rounded-2xl p-6"
+              className="glass max-h-[85svh] w-full max-w-md overflow-y-auto rounded-2xl p-6"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="mb-5 flex items-center justify-between">
