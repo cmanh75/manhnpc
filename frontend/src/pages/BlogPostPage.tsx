@@ -1,16 +1,20 @@
 import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { motion, useScroll, useSpring } from 'framer-motion'
 import Markdown from 'react-markdown'
-import { ArrowLeft, Clock, Eye, Calendar } from 'lucide-react'
+import { ArrowLeft, Clock, Eye, Calendar, Trash2 } from 'lucide-react'
 import { PageShell, LikeButton } from '../components/ui'
 import { api } from '../lib/api'
 import type { Post } from '../lib/types'
 import { formatDate, formatNumber } from '../lib/utils'
+import { useAppStore } from '../store/useAppStore'
 
 export function BlogPostPage() {
   const { slug } = useParams<{ slug: string }>()
+  const navigate = useNavigate()
+  const owner = useAppStore((s) => s.owner)
   const [post, setPost] = useState<Post | null | undefined>(null)
+  const [deleting, setDeleting] = useState(false)
   const { scrollYProgress } = useScroll()
   const progress = useSpring(scrollYProgress, { stiffness: 120, damping: 26 })
 
@@ -18,6 +22,19 @@ export function BlogPostPage() {
     window.scrollTo(0, 0)
     if (slug) api.getPost(slug).then((p) => setPost(p ?? undefined)).catch(() => setPost(undefined))
   }, [slug])
+
+  async function deletePost() {
+    if (!post) return
+    if (!confirm(`Delete "${post.title}"?`)) return
+    setDeleting(true)
+    try {
+      await api.deletePost(post.id)
+      navigate('/blog')
+    } catch {
+      alert('could not delete')
+      setDeleting(false)
+    }
+  }
 
   if (post === undefined) {
     return (
@@ -74,6 +91,15 @@ export function BlogPostPage() {
               <span className="flex items-center gap-1.5"><Clock size={12} />{post.readingTime} min read</span>
               <span className="flex items-center gap-1.5"><Eye size={12} />{formatNumber(post.views)} views</span>
               <LikeButton likeKey={`post-${post.id}`} />
+              {owner && (
+                <button
+                  onClick={deletePost}
+                  disabled={deleting}
+                  className="flex items-center gap-1.5 text-pink transition hover:text-pink/80 disabled:opacity-40"
+                >
+                  <Trash2 size={12} /> {deleting ? 'deleting…' : 'delete'}
+                </button>
+              )}
             </div>
           </header>
 

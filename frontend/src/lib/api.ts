@@ -101,6 +101,10 @@ export const api = {
     }
   },
 
+  async deletePost(id: number): Promise<void> {
+    await client.delete(`/posts/${id}`)
+  },
+
   async getPhotos(category?: string): Promise<Photo[]> {
     const data = await trackedGet('/media/photos', category && category !== 'all' ? { category } : {})
     return assertJsonArray<Photo>(data, 'getPhotos')
