@@ -199,6 +199,26 @@ export const api = {
     return assertJsonArray<Video>(data, 'uploadVideos')
   },
 
+  async updatePhoto(
+    id: number,
+    changes: { file?: File; title?: string; description?: string; category?: string; location?: string; takenAt?: string },
+    onProgress?: (percent: number) => void,
+  ): Promise<Photo> {
+    const form = new FormData()
+    if (changes.file) form.append('file', changes.file)
+    if (changes.title !== undefined) form.append('title', changes.title)
+    if (changes.description !== undefined) form.append('description', changes.description)
+    if (changes.category !== undefined) form.append('category', changes.category)
+    if (changes.location !== undefined) form.append('location', changes.location)
+    if (changes.takenAt !== undefined) form.append('takenAt', changes.takenAt)
+    const { data } = await client.put(`/media/photos/${id}`, form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 60_000,
+      onUploadProgress: onProgress && ((e) => onProgress(e.total ? Math.round((e.loaded / e.total) * 100) : 0)),
+    })
+    return assertJsonObject<Photo>(data, 'updatePhoto')
+  },
+
   async deletePhoto(id: number): Promise<void> {
     await client.delete(`/media/photos/${id}`)
   },

@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -171,6 +172,31 @@ public class MediaController {
                 Files.deleteIfExists(processed.thumbnail());
             }
         }
+    }
+
+    @PutMapping("/photos/{id}")
+    public Photo updatePhoto(@PathVariable Long id,
+                             @RequestParam(required = false) MultipartFile file,
+                             @RequestParam(required = false) String title,
+                             @RequestParam(required = false) String description,
+                             @RequestParam(required = false) String category,
+                             @RequestParam(required = false) String location,
+                             @RequestParam(required = false) String takenAt) throws IOException {
+        Photo photo = photos.findById(id).orElseThrow(() -> new NotFoundException("Photo not found: " + id));
+        if (title != null && !title.isBlank()) photo.setTitle(title);
+        if (description != null) photo.setDescription(description);
+        if (category != null && !category.isBlank()) photo.setCategory(category);
+        if (location != null) photo.setLocation(location);
+        if (takenAt != null && !takenAt.isBlank()) photo.setTakenAt(LocalDateTime.parse(takenAt));
+        if (file != null && !file.isEmpty()) {
+            String oldKey = photo.getStorageKey();
+            UploadResult result = storage.upload(file, "photos");
+            photo.setUrl(result.url());
+            photo.setThumbnailUrl(result.url());
+            photo.setStorageKey(result.key());
+            storage.delete(oldKey);
+        }
+        return photos.save(photo);
     }
 
     @DeleteMapping("/photos/{id}")

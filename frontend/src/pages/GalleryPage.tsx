@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
-import { X, ChevronLeft, ChevronRight, MapPin, Calendar, Search, Plus, Trash2, Upload, Play, Clock } from 'lucide-react'
+import { X, ChevronLeft, ChevronRight, MapPin, Calendar, Search, Plus, Trash2, Upload, Play, Clock, Pencil } from 'lucide-react'
 import { PageShell, SectionHeading, Reveal } from '../components/ui'
 import { api } from '../lib/api'
 import type { Photo, Video } from '../lib/types'
@@ -325,6 +325,12 @@ export function GalleryPage() {
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
 
+  const [showEdit, setShowEdit] = useState(false)
+  const [editForm, setEditForm] = useState({ title: '', description: '', category: 'life' as string, location: '', takenAt: '', file: null as File | null })
+  const [editing, setEditing] = useState(false)
+  const [editProgress, setEditProgress] = useState(0)
+  const [editError, setEditError] = useState<string | null>(null)
+
   useEffect(() => {
     api.getPhotos().then(setPhotos).catch(() => {})
     api.getVideos().then(setVideos).catch(() => {})
@@ -370,7 +376,7 @@ export function GalleryPage() {
   // in-flow footer through the fullscreen overlay. `overflow: hidden` on body alone doesn't stop
   // touch scroll on iOS/Android, so pin body to the current scroll position with `position: fixed`.
   useEffect(() => {
-    if (lightbox === null && !showUpload) return
+    if (lightbox === null && !showUpload && !showEdit) return
     const scrollY = window.scrollY
     const body = document.body.style
     const previous = { position: body.position, top: body.top, left: body.left, right: body.right, width: body.width }
@@ -387,7 +393,7 @@ export function GalleryPage() {
       body.width = previous.width
       window.scrollTo(0, scrollY)
     }
-  }, [lightbox, showUpload])
+  }, [lightbox, showUpload, showEdit])
 
   // keyboard navigation for the fullscreen viewer
   useEffect(() => {
@@ -466,6 +472,50 @@ export function GalleryPage() {
       alert('could not delete')
     } finally {
       setDeleting(false)
+    }
+  }
+
+  function openEdit() {
+    if (!current || current.kind !== 'photo') return
+    setEditForm({
+      title: current.photo.title,
+      description: current.photo.description ?? '',
+      category: current.photo.category,
+      location: current.photo.location ?? '',
+      takenAt: current.photo.takenAt.slice(0, 16),
+      file: null,
+    })
+    setEditError(null)
+    setShowEdit(true)
+  }
+
+  const editPreviewUrl = useMemo(() => (editForm.file ? URL.createObjectURL(editForm.file) : null), [editForm.file])
+  useEffect(() => () => { if (editPreviewUrl) URL.revokeObjectURL(editPreviewUrl) }, [editPreviewUrl])
+
+  async function submitEdit() {
+    if (!current || current.kind !== 'photo' || !editForm.title.trim()) return
+    setEditing(true)
+    setEditProgress(0)
+    setEditError(null)
+    try {
+      const updated = await api.updatePhoto(
+        current.photo.id,
+        {
+          file: editForm.file ?? undefined,
+          title: editForm.title.trim(),
+          description: editForm.description.trim(),
+          category: editForm.category,
+          location: editForm.location.trim(),
+          takenAt: editForm.takenAt || undefined,
+        },
+        setEditProgress,
+      )
+      setPhotos((prev) => prev.map((p) => (p.id === updated.id ? updated : p)))
+      setShowEdit(false)
+    } catch {
+      setEditError('update failed — check the backend/R2 config')
+    } finally {
+      setEditing(false)
     }
   }
 
@@ -653,6 +703,7 @@ export function GalleryPage() {
                 <img
                   src={current.photo.url}
                   alt={current.photo.title}
+                  draggable={false}
                   className="max-h-[74svh] max-w-full rounded-xl object-contain shadow-2xl"
                 />
               ) : (
@@ -679,6 +730,17 @@ export function GalleryPage() {
                     <span className="flex items-center gap-1.5"><MapPin size={11} className="text-cyan" />{current.photo.location}</span>
                   )}
                   <span className="flex items-center gap-1.5"><Calendar size={11} />{formatDate(current.date)}</span>
+                  {owner && current.kind === 'photo' && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        openEdit()
+                      }}
+                      className="flex items-center gap-1.5 text-cyan transition hover:text-cyan/80"
+                    >
+                      <Pencil size={11} /> edit
+                    </button>
+                  )}
                   {owner && (
                     <button
                       onClick={(e) => {
@@ -857,6 +919,108 @@ export function GalleryPage() {
                 <span className="relative flex items-center gap-2">
                   <Upload size={14} />
                   {uploading ? (uploadProgress >= 100 ? 'processing…' : `uploading… ${uploadProgress}%`) : 'post'}
+                </span>
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ===== owner edit-photo modal ===== */}
+      <AnimatePresence>
+        {owner && showEdit && current?.kind === 'photo' && (
+          <motion.div
+            className="fixed inset-0 z-[90] flex items-center justify-center bg-black/90 p-4 backdrop-blur-md"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => !editing && setShowEdit(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 16 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+              className="glass max-h-[85svh] w-full max-w-md overflow-y-auto rounded-2xl p-6"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="mb-5 flex items-center justify-between">
+                <h3 className="font-display text-lg font-semibold">Edit photo</h3>
+                <button onClick={() => setShowEdit(false)} className="rounded-full p-1.5 text-muted transition hover:bg-white/10 hover:text-ink">
+                  <X size={16} />
+                </button>
+              </div>
+
+              <label className="mb-3 block cursor-pointer overflow-hidden rounded-xl border border-dashed border-white/15 transition hover:border-cyan/40">
+                <img
+                  src={editPreviewUrl ?? current.photo.thumbnailUrl}
+                  alt=""
+                  className="max-h-48 w-full object-cover"
+                />
+                <div className="flex items-center justify-center gap-2 bg-white/5 py-2 font-mono text-xs text-muted hover:text-cyan">
+                  <Upload size={13} /> replace photo (optional)
+                </div>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => setEditForm((f) => ({ ...f, file: e.target.files?.[0] ?? null }))}
+                />
+              </label>
+
+              <input
+                value={editForm.title}
+                onChange={(e) => setEditForm((f) => ({ ...f, title: e.target.value }))}
+                placeholder="title"
+                className="mb-3 w-full rounded-xl bg-white/5 px-4 py-2.5 font-mono text-sm outline-none ring-1 ring-white/10 placeholder:text-faint focus:ring-cyan/50"
+              />
+              <textarea
+                value={editForm.description}
+                onChange={(e) => setEditForm((f) => ({ ...f, description: e.target.value }))}
+                placeholder="caption"
+                rows={3}
+                className="mb-3 w-full resize-none rounded-xl bg-white/5 px-4 py-2.5 font-mono text-sm outline-none ring-1 ring-white/10 placeholder:text-faint focus:ring-cyan/50"
+              />
+              <div className="mb-3 flex gap-3">
+                <select
+                  value={editForm.category}
+                  onChange={(e) => setEditForm((f) => ({ ...f, category: e.target.value }))}
+                  className="rounded-xl bg-white/5 px-4 py-2.5 font-mono text-sm outline-none ring-1 ring-white/10 focus:ring-cyan/50"
+                >
+                  {uploadCategories.map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+                <input
+                  value={editForm.location}
+                  onChange={(e) => setEditForm((f) => ({ ...f, location: e.target.value }))}
+                  placeholder="location (optional)"
+                  className="min-w-0 flex-1 rounded-xl bg-white/5 px-4 py-2.5 font-mono text-sm outline-none ring-1 ring-white/10 placeholder:text-faint focus:ring-cyan/50"
+                />
+              </div>
+              <input
+                type="datetime-local"
+                value={editForm.takenAt}
+                onChange={(e) => setEditForm((f) => ({ ...f, takenAt: e.target.value }))}
+                className="mb-3 w-full rounded-xl bg-white/5 px-4 py-2.5 font-mono text-sm outline-none ring-1 ring-white/10 [color-scheme:dark] focus:ring-cyan/50"
+              />
+
+              {editError && <p className="mb-3 font-mono text-xs text-pink">{editError}</p>}
+
+              <button
+                onClick={submitEdit}
+                disabled={editing || !editForm.title.trim()}
+                className="relative inline-flex w-full items-center justify-center gap-2 overflow-hidden rounded-xl bg-gradient-to-r from-cyan to-violet px-5 py-2.5 font-mono text-sm font-semibold text-void transition enabled:hover:shadow-[0_0_24px_-6px_#22d3ee] disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {editing && (
+                  <span
+                    className="absolute inset-y-0 left-0 bg-white/25 transition-[width] duration-200"
+                    style={{ width: `${editProgress}%` }}
+                  />
+                )}
+                <span className="relative flex items-center gap-2">
+                  <Pencil size={14} />
+                  {editing ? 'saving…' : 'save changes'}
                 </span>
               </button>
             </motion.div>
