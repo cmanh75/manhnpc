@@ -349,8 +349,8 @@ export function GalleryPage() {
     if (lightbox === null) return
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setLightbox(null)
-      if (e.key === 'ArrowRight') setLightbox((i) => (i === null ? null : (i + 1) % viewerItems.length))
-      if (e.key === 'ArrowLeft') setLightbox((i) => (i === null ? null : (i - 1 + viewerItems.length) % viewerItems.length))
+      if (e.key === 'ArrowRight') setLightbox((i) => (i === null ? null : Math.min(i + 1, viewerItems.length - 1)))
+      if (e.key === 'ArrowLeft') setLightbox((i) => (i === null ? null : Math.max(i - 1, 0)))
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -560,11 +560,12 @@ export function GalleryPage() {
             </button>
 
             <button
-              className="absolute left-3 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white/10 p-3 text-ink transition hover:bg-white/20 md:left-8"
+              className="absolute left-3 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white/10 p-3 text-ink transition hover:bg-white/20 disabled:pointer-events-none disabled:opacity-30 md:left-8"
               onClick={(e) => {
                 e.stopPropagation()
-                setLightbox((i) => (i === null ? null : (i - 1 + viewerItems.length) % viewerItems.length))
+                setLightbox((i) => (i === null ? null : Math.max(i - 1, 0)))
               }}
+              disabled={(lightbox ?? 0) === 0}
               aria-label="Previous"
             >
               <ChevronLeft size={20} />
@@ -626,18 +627,19 @@ export function GalleryPage() {
             </motion.figure>
 
             <button
-              className="absolute right-3 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white/10 p-3 text-ink transition hover:bg-white/20 md:right-8"
+              className="absolute right-3 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white/10 p-3 text-ink transition hover:bg-white/20 disabled:pointer-events-none disabled:opacity-30 md:right-8"
               onClick={(e) => {
                 e.stopPropagation()
-                setLightbox((i) => (i === null ? null : (i + 1) % filtered.length))
+                setLightbox((i) => (i === null ? null : Math.min(i + 1, viewerItems.length - 1)))
               }}
+              disabled={(lightbox ?? 0) === viewerItems.length - 1}
               aria-label="Next"
             >
               <ChevronRight size={20} />
             </button>
 
             <div className="absolute bottom-5 left-1/2 -translate-x-1/2 font-mono text-[11px] text-faint">
-              {(lightbox ?? 0) + 1} / {filtered.length} · use ← → keys
+              {(lightbox ?? 0) + 1} / {viewerItems.length} · use ← → keys
             </div>
           </motion.div>
         )}
