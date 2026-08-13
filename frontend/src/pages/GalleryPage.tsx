@@ -18,10 +18,12 @@ type FeedItem =
   | { kind: 'video'; id: number; date: string; category: string; video: Video }
   | { kind: 'video-group'; id: number; date: string; category: string; videos: Video[] }
 
-/** One entry per individually viewable photo/video, in feed order — what the fullscreen viewer navigates. */
+/** One entry per individually viewable photo/video, in feed order — what the fullscreen viewer navigates.
+ *  groupIndex/groupTotal are set only for items that belong to a multi-photo/video post, so the
+ *  viewer can show "2/5" scoped to that post instead of position across the whole feed. */
 type ViewerItem =
-  | { kind: 'photo'; id: number; date: string; photo: Photo }
-  | { kind: 'video'; id: number; date: string; video: Video }
+  | { kind: 'photo'; id: number; date: string; photo: Photo; groupIndex?: number; groupTotal?: number }
+  | { kind: 'video'; id: number; date: string; video: Video; groupIndex?: number; groupTotal?: number }
 
 /** Groups items sharing a groupId together (sorted by position), keeping ungrouped items standalone. */
 function groupByGroupId<T extends { groupId?: string | null; position?: number }>(items: T[]): { standalone: T[]; groups: T[][] } {
@@ -67,11 +69,15 @@ function toViewer(feed: FeedItem[]): { viewerItems: ViewerItem[]; startIndex: nu
     if (item.kind === 'photo') {
       viewerItems.push({ kind: 'photo', id: item.photo.id, date: item.photo.takenAt, photo: item.photo })
     } else if (item.kind === 'photo-group') {
-      for (const photo of item.photos) viewerItems.push({ kind: 'photo', id: photo.id, date: photo.takenAt, photo })
+      item.photos.forEach((photo, idx) => {
+        viewerItems.push({ kind: 'photo', id: photo.id, date: photo.takenAt, photo, groupIndex: idx + 1, groupTotal: item.photos.length })
+      })
     } else if (item.kind === 'video') {
       viewerItems.push({ kind: 'video', id: item.video.id, date: item.video.createdAt, video: item.video })
     } else {
-      for (const video of item.videos) viewerItems.push({ kind: 'video', id: video.id, date: video.createdAt, video })
+      item.videos.forEach((video, idx) => {
+        viewerItems.push({ kind: 'video', id: video.id, date: video.createdAt, video, groupIndex: idx + 1, groupTotal: item.videos.length })
+      })
     }
   }
   return { viewerItems, startIndex }
@@ -209,28 +215,29 @@ function VideoTile({ video, title, onOpen }: { video: Video; title: string; onOp
 /** Click-and-drag horizontal scrolling for a snap-scroll track, for desktop mouse users —
  *  touch/trackpad already get this for free from native scrolling, so only mouse pointers
  *  are handled here. Suppresses the click on whatever's under the cursor once a drag moves
- *  past a small threshold, so dragging doesn't also open the item you dragged over. */
+ *  past a small threshold, so dragging doesn't also open the item you dragged over.
+ *  Tracks the drag via window-level listeners rather than setPointerCapture — capturing on
+ *  the track retargets the resulting click event to the track itself instead of the button
+ *  underneath it, which broke opening photos/videos on every click, not just drags. */
 function useDragToScroll(trackRef: RefObject<HTMLDivElement | null>) {
-  const state = useRef({ down: false, dragged: false, startX: 0, startScroll: 0 })
+  const state = useRef({ dragged: false, startX: 0, startScroll: 0 })
 
   function onPointerDown(e: React.PointerEvent<HTMLDivElement>) {
     const el = trackRef.current
     if (!el || e.pointerType !== 'mouse') return
-    el.setPointerCapture(e.pointerId)
-    state.current = { down: true, dragged: false, startX: e.clientX, startScroll: el.scrollLeft }
-  }
+    state.current = { dragged: false, startX: e.clientX, startScroll: el.scrollLeft }
 
-  function onPointerMove(e: React.PointerEvent<HTMLDivElement>) {
-    const el = trackRef.current
-    const s = state.current
-    if (!el || !s.down) return
-    const delta = e.clientX - s.startX
-    if (Math.abs(delta) > 4) s.dragged = true
-    el.scrollLeft = s.startScroll - delta
-  }
-
-  function onPointerUp() {
-    state.current.down = false
+    function onMove(ev: PointerEvent) {
+      const delta = ev.clientX - state.current.startX
+      if (Math.abs(delta) > 4) state.current.dragged = true
+      el!.scrollLeft = state.current.startScroll - delta
+    }
+    function onUp() {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+    }
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
   }
 
   function onClickCapture(e: React.MouseEvent) {
@@ -241,7 +248,7 @@ function useDragToScroll(trackRef: RefObject<HTMLDivElement | null>) {
     }
   }
 
-  return { onPointerDown, onPointerMove, onPointerUp, onClickCapture }
+  return { onPointerDown, onClickCapture }
 }
 
 /** Instagram-style swipeable carousel embedded in a feed card, with dot indicators. */
@@ -814,7 +821,7 @@ export function GalleryPage() {
             </button>
 
             <div className="absolute bottom-5 left-1/2 -translate-x-1/2 font-mono text-[11px] text-faint">
-              {(lightbox ?? 0) + 1} / {viewerItems.length} · use ← → keys
+              {current.groupTotal ? `${current.groupIndex} / ${current.groupTotal} · ` : ''}use ← → keys
             </div>
           </motion.div>
         )}
