@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, NavLink, useLocation } from 'react-router-dom'
-import { motion } from 'framer-motion'
-import { Command, LogOut, Terminal } from 'lucide-react'
+import { AnimatePresence, motion } from 'framer-motion'
+import { Command, LogOut, Menu, Terminal, X } from 'lucide-react'
 import { clsx } from '../../lib/utils'
 import { useAppStore } from '../../store/useAppStore'
 import { auth } from '../../lib/api'
@@ -17,6 +17,7 @@ const links = [
 
 export function Navbar() {
   const [scrolled, setScrolled] = useState(false)
+  const [mobileOpen, setMobileOpen] = useState(false)
   const setPaletteOpen = useAppStore((s) => s.setPaletteOpen)
   const owner = useAppStore((s) => s.owner)
   const setOwner = useAppStore((s) => s.setOwner)
@@ -30,12 +31,18 @@ export function Navbar() {
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
+  // the nav-link row is desktop-only (`md:flex`), so the mobile menu is the only way to reach
+  // any tab beyond the current page — close it on every navigation so it doesn't linger.
+  useEffect(() => {
+    setMobileOpen(false)
+  }, [location.pathname])
+
   return (
     <motion.header
       initial={{ y: -80, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1], delay: 0.1 }}
-      className="fixed inset-x-0 top-0 z-50 flex justify-center px-4 pt-4"
+      className="fixed inset-x-0 top-0 z-50 flex flex-col items-center px-4 pt-4"
     >
       <nav
         className={clsx(
@@ -112,8 +119,44 @@ export function Navbar() {
             <span className="hidden sm:inline">cmd</span>
             <kbd className="rounded bg-white/10 px-1.5 py-0.5 text-[10px]">⌘K</kbd>
           </button>
+          <button
+            onClick={() => setMobileOpen((v) => !v)}
+            className="glass flex items-center justify-center rounded-lg p-2 text-muted transition hover:text-ink md:hidden"
+            aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
+          >
+            {mobileOpen ? <X size={16} /> : <Menu size={16} />}
+          </button>
         </div>
       </nav>
+
+      <AnimatePresence>
+        {mobileOpen && (
+          <motion.ul
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.2 }}
+            className="glass-strong mt-2 flex w-full max-w-5xl flex-col gap-1 rounded-2xl p-2 md:hidden"
+          >
+            {navLinks.map((link) => (
+              <li key={link.to}>
+                <NavLink
+                  to={link.to}
+                  end={link.end}
+                  className={({ isActive }) =>
+                    clsx(
+                      'block rounded-lg px-3 py-2 font-mono text-sm transition',
+                      isActive ? 'bg-cyan/10 text-cyan ring-1 ring-cyan/25' : 'text-muted hover:bg-white/5 hover:text-ink',
+                    )
+                  }
+                >
+                  {link.label}
+                </NavLink>
+              </li>
+            ))}
+          </motion.ul>
+        )}
+      </AnimatePresence>
     </motion.header>
   )
 }

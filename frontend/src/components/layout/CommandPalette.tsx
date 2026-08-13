@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Home, Image, FileText, User, MessageSquare, Search, CornerDownLeft, Sparkles, Lock } from 'lucide-react'
+import { Home, Image, FileText, User, MessageSquare, Search, CornerDownLeft, Sparkles } from 'lucide-react'
 import { GithubIcon } from '../ui/BrandIcons'
 import { MatrixRain } from '../ui/Effects'
 import { useAppStore } from '../../store/useAppStore'
@@ -40,7 +40,6 @@ export function CommandPalette() {
       { id: 'blog', label: 'Read the blog', hint: '/blog', icon: <FileText size={15} />, action: () => navigate('/blog') },
       { id: 'guestbook', label: 'Sign the guestbook', hint: '/guestbook', icon: <MessageSquare size={15} />, action: () => navigate('/guestbook') },
       { id: 'about', label: 'About me', hint: '/about', icon: <User size={15} />, action: () => navigate('/about') },
-      { id: 'login', label: 'Owner login', hint: '/login', icon: <Lock size={15} />, action: () => navigate('/login') },
       { id: 'github', label: 'Open GitHub', hint: 'external', icon: <GithubIcon size={15} />, action: () => window.open('https://github.com/manhnpc', '_blank') },
       { id: 'matrix', label: 'sudo enter-the-matrix', hint: 'easter egg', icon: <Sparkles size={15} />, action: () => setMatrix(true) },
     ],
