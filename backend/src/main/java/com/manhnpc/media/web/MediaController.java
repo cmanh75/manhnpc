@@ -8,7 +8,9 @@ import com.manhnpc.common.storage.R2StorageService;
 import com.manhnpc.common.storage.R2StorageService.UploadResult;
 import com.manhnpc.media.storage.VideoProcessor;
 import com.manhnpc.media.storage.VideoProcessor.ProcessedVideo;
+import com.manhnpc.common.security.OwnerRequests;
 import com.manhnpc.common.web.error.NotFoundException;
+import jakarta.servlet.http.HttpServletRequest;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -257,18 +259,22 @@ public class MediaController {
     }
 
     @PostMapping("/photos/{id}/view")
-    public ResponseEntity<Void> recordPhotoView(@PathVariable Long id) {
-        Photo photo = photos.findById(id).orElseThrow(() -> new NotFoundException("Photo not found: " + id));
-        photo.setViews(photo.getViews() + 1);
-        photos.save(photo);
+    public ResponseEntity<Void> recordPhotoView(@PathVariable Long id, HttpServletRequest request) {
+        if (!OwnerRequests.isOwner(request)) {
+            Photo photo = photos.findById(id).orElseThrow(() -> new NotFoundException("Photo not found: " + id));
+            photo.setViews(photo.getViews() + 1);
+            photos.save(photo);
+        }
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/videos/{id}/view")
-    public ResponseEntity<Void> recordVideoView(@PathVariable Long id) {
-        Video video = videos.findById(id).orElseThrow(() -> new NotFoundException("Video not found: " + id));
-        video.setViews(video.getViews() + 1);
-        videos.save(video);
+    public ResponseEntity<Void> recordVideoView(@PathVariable Long id, HttpServletRequest request) {
+        if (!OwnerRequests.isOwner(request)) {
+            Video video = videos.findById(id).orElseThrow(() -> new NotFoundException("Video not found: " + id));
+            video.setViews(video.getViews() + 1);
+            videos.save(video);
+        }
         return ResponseEntity.noContent().build();
     }
 

@@ -2,6 +2,7 @@ package com.manhnpc.audit.web;
 
 import com.manhnpc.audit.model.VisitLog;
 import com.manhnpc.audit.repository.VisitLogRepository;
+import com.manhnpc.common.security.OwnerRequests;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -9,7 +10,6 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -39,12 +39,6 @@ public class AuditController {
                              List<CountEntry> visitsByDay) {
     }
 
-    /** Fallback for when the owner is browsing logged out (no JWT yet, so no principal to check) —
-     *  their home/mobile network's public IP, not any specific device (NAT means every device on
-     *  that connection shares it). Mobile carrier IPs rotate, so this list may need the occasional
-     *  update; JwtAuthFilter-based skip below covers the common logged-in case regardless of network. */
-    private static final Set<String> IGNORED_IPS = Set.of("58.186.123.46", "27.68.212.237");
-
     private final VisitLogRepository visits;
 
     public AuditController(VisitLogRepository visits) {
@@ -55,12 +49,8 @@ public class AuditController {
     @PostMapping("/visit")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void recordVisit(@RequestBody(required = false) VisitRequest body, HttpServletRequest request) {
-        // JwtAuthFilter authenticates any request carrying the owner's token, public endpoint or
-        // not — the frontend's axios interceptor attaches it whenever a logged-in session exists,
-        // so this is "is it the owner's browser" independent of which network they're on.
-        if (request.getUserPrincipal() != null) return;
-        String ip = clientIp(request);
-        if (IGNORED_IPS.contains(ip)) return;
+        if (OwnerRequests.isOwner(request)) return;
+        String ip = OwnerRequests.clientIp(request);
         String userAgent = trim(request.getHeader("User-Agent"), 500);
         UserAgentParser.Info info = UserAgentParser.parse(userAgent);
         VisitLog log = VisitLog.builder()
@@ -117,14 +107,6 @@ public class AuditController {
                 .map(e -> new CountEntry(e.getKey(), e.getValue()))
                 .sorted(Comparator.comparing(CountEntry::label))
                 .toList();
-    }
-
-    private static String clientIp(HttpServletRequest request) {
-        String xff = request.getHeader("X-Forwarded-For");
-        if (xff != null && !xff.isBlank()) {
-            return xff.split(",")[0].trim();
-        }
-        return request.getRemoteAddr();
     }
 
     private static String trim(String value, int maxLength) {

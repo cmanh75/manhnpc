@@ -2,7 +2,9 @@ package com.manhnpc.content.web;
 
 import com.manhnpc.content.model.Post;
 import com.manhnpc.content.repository.PostRepository;
+import com.manhnpc.common.security.OwnerRequests;
 import com.manhnpc.common.web.error.NotFoundException;
+import jakarta.servlet.http.HttpServletRequest;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
@@ -74,12 +76,15 @@ public class PostController {
     }
 
     @GetMapping("/{slug}")
-    public Post bySlug(@PathVariable String slug) {
+    public Post bySlug(@PathVariable String slug, HttpServletRequest request) {
         Post post = posts.findBySlug(slug)
                 .filter(Post::isPublished)
                 .orElseThrow(() -> new NotFoundException("Post not found: " + slug));
-        post.setViews(post.getViews() + 1);
-        return posts.save(post);
+        if (!OwnerRequests.isOwner(request)) {
+            post.setViews(post.getViews() + 1);
+            posts.save(post);
+        }
+        return post;
     }
 
     @PostMapping
