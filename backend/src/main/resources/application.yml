@@ -19,8 +19,11 @@ spring:
       path: /h2-console
   servlet:
     multipart:
-      max-file-size: 50MB
-      max-request-size: 50MB
+      # per-file / whole-batch ceilings — a "New post" upload bundles several
+      # raw phone videos in one multipart request, so max-request-size has to
+      # cover the sum of all files, not just one
+      max-file-size: 300MB
+      max-request-size: 500MB
 
 jwt:
   secret: ${JWT_SECRET}

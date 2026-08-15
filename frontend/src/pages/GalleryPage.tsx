@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
+import axios from 'axios'
 import { useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { X, ChevronLeft, ChevronRight, MapPin, Calendar, Search, Plus, Trash2, Upload, Play, Clock, Pencil, Eye } from 'lucide-react'
@@ -503,8 +504,9 @@ export function GalleryPage() {
       setVideos((prev) => [...uploaded.videos, ...prev])
       setShowUpload(false)
       setUploadForm(emptyUploadForm())
-    } catch {
-      setUploadError('upload failed — check the backend/R2 config')
+    } catch (err) {
+      const serverMessage = axios.isAxiosError(err) ? (err.response?.data as { message?: string } | undefined)?.message : undefined
+      setUploadError(serverMessage || 'upload failed — check the backend/R2 config')
     } finally {
       setUploading(false)
     }
