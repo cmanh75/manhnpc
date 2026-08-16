@@ -795,6 +795,11 @@ export function GalleryPage() {
                   controls
                   autoPlay
                   playsInline
+                  onEnded={(e) => {
+                    const el = e.currentTarget
+                    el.currentTime = 0
+                    el.load()
+                  }}
                   className="max-h-[74svh] max-w-full rounded-xl bg-black object-contain shadow-2xl"
                 />
               )}
