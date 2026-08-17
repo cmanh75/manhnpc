@@ -11,7 +11,7 @@ const links = [
   // globe tab temporarily hidden — route still works, just not promoted in nav
   { to: '/gallery', label: 'gallery' },
   { to: '/blog', label: 'blog' },
-  { to: '/guestbook', label: 'guestbook' },
+  // guestbook tab temporarily hidden — route still works, just not promoted in nav
   { to: '/about', label: 'about' },
 ]
 

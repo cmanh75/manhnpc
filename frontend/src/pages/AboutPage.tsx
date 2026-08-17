@@ -19,9 +19,9 @@ const emptyProfile: Profile = {
 }
 
 const timeline = [
-  { year: '2019', title: 'Started at Ha Tinh High School for the Gifted', body: 'Studied mathematics and built the problem-solving foundation that led me into competitive programming and software.' },
-  { year: '2022', title: 'Began studying Computer Science at HUST', body: 'Started my Computer Science degree at Hanoi University of Science and Technology and earned a prize at the Vietnam Olympiad in Informatics.' },
-  { year: '2025', title: 'Joined Viettel Software', body: 'Started working as a Junior Software Engineer, building enterprise REST APIs and database-backed services with Java Spring Boot.' },
+  { year: '2019', title: 'Started at Ha Tinh High School for the Gifted', body: 'Studied mathematics and built the problem-solving foundation that led me into competitive programming and software, and earned a prize at the Vietnam Olympiad in Informatics.' },
+  { year: '2022', title: 'Began studying Computer Science at HUST', body: 'Started my Computer Science degree at Hanoi University of Science and Technology.' },
+  { year: '2025', title: 'Joined Viettel Software', body: 'Started working as a Software Engineer, building enterprise REST APIs and database-backed services with Java Spring Boot.' },
   { year: '2026', title: 'Built this universe', body: 'Created a self-hosted place for my memories, journeys, photos, writing, and everything I make along the way.' },
 ]
 

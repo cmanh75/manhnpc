@@ -34,14 +34,14 @@ public class ProfileController {
         return new ProfileResponse(
                 "Nguyen Phi Cuong Manh",
                 "manhnpc",
-                "Junior Software Engineer",
+                "Software Engineer",
                 "Viettel Software",
                 "Hanoi, Vietnam",
                 "I build software and keep the moments around it. This is my personal universe — "
                         + "a self-hosted home for my photos, journeys, writing, and the things I create along the way.",
                 avatarUrl,
                 List.of("Java", "Spring Boot", "Python", "FastAPI", "ReactJS", "WebSocket",
-                        "PostgreSQL", "MariaDB", "Docker", "Git", "C", "C++"),
+                        "PostgreSQL", "MariaDB", "Redis", "Kafka", "Elasticsearch", "Docker", "Git", "C", "C++"),
                 socials,
                 stats);
     }
