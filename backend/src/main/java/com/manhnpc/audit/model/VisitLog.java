@@ -16,7 +16,7 @@ import lombok.Setter;
 
 /**
  * One row per page view — standard web-server-access-log fields only
- * (IP, user agent, path, referrer, language, timestamp, country). Country is
+ * (IP, user agent, path, referrer, language, timestamp, country, city). Country/city are
  * resolved offline from a local MaxMind GeoLite2 database (see audit.geo.GeoIpService) —
  * the visitor's IP never leaves the server. No fingerprinting, no persistent visitor/cookie IDs.
  */
@@ -57,6 +57,9 @@ public class VisitLog {
     /** ISO 3166-1 alpha-2 code (e.g. "VN"), null if unresolved (private/reserved IP, or GeoIP not configured). */
     @Column(length = 2)
     private String country;
+
+    @Column(length = 100)
+    private String city;
 
     private LocalDateTime createdAt;
 

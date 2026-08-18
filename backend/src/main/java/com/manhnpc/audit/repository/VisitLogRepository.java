@@ -19,5 +19,5 @@ public interface VisitLogRepository extends JpaRepository<VisitLog, Long> {
 
     long countByCreatedAtAfter(LocalDateTime after);
 
-    List<VisitLog> findByCountryIsNullAndIpAddressIsNotNull();
+    List<VisitLog> findByCityIsNullAndIpAddressIsNotNull();
 }

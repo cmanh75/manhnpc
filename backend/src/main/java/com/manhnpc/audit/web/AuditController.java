@@ -37,7 +37,7 @@ public class AuditController {
     public record VisitStats(long totalVisits, long uniqueIps, long visitsToday, long visitsLast30Days,
                              List<CountEntry> topPaths, List<CountEntry> topReferrers,
                              List<CountEntry> browsers, List<CountEntry> operatingSystems,
-                             List<CountEntry> topCountries, List<CountEntry> visitsByDay) {
+                             List<CountEntry> topCountries, List<CountEntry> topCities, List<CountEntry> visitsByDay) {
     }
 
     private final VisitLogRepository visits;
@@ -56,6 +56,7 @@ public class AuditController {
         String ip = OwnerRequests.clientIp(request);
         String userAgent = trim(request.getHeader("User-Agent"), 500);
         UserAgentParser.Info info = UserAgentParser.parse(userAgent);
+        GeoIpService.GeoLocation geo = geoIp.lookup(ip).orElse(null);
         VisitLog log = VisitLog.builder()
                 .ipAddress(trim(ip, 64))
                 .userAgent(userAgent)
@@ -64,7 +65,8 @@ public class AuditController {
                 .path(trim(body != null && body.path() != null && !body.path().isBlank() ? body.path() : "/", 300))
                 .referrer(trim(body != null ? body.referrer() : null, 500))
                 .language(trim(body != null ? body.language() : request.getHeader("Accept-Language"), 40))
-                .country(geoIp.countryCode(ip).orElse(null))
+                .country(geo != null ? geo.countryCode() : null)
+                .city(trim(geo != null ? geo.city() : null, 100))
                 .build();
         visits.save(log);
     }
@@ -93,6 +95,7 @@ public class AuditController {
                 topOf(recent, v -> v.getBrowser() == null ? "unknown" : v.getBrowser(), 10),
                 topOf(recent, v -> v.getOs() == null ? "unknown" : v.getOs(), 10),
                 topOf(recent, v -> v.getCountry() == null ? "unknown" : v.getCountry(), 10),
+                topOf(recent, AuditController::cityLabel, 10),
                 byDay(recent));
     }
 
@@ -112,6 +115,12 @@ public class AuditController {
                 .map(e -> new CountEntry(e.getKey(), e.getValue()))
                 .sorted(Comparator.comparing(CountEntry::label))
                 .toList();
+    }
+
+    /** "Hanoi, VN" — disambiguates same-named cities in different countries (e.g. Paris, FR vs Paris, US). */
+    private static String cityLabel(VisitLog v) {
+        if (v.getCity() == null || v.getCity().isBlank()) return "unknown";
+        return v.getCountry() == null ? v.getCity() : v.getCity() + ", " + v.getCountry();
     }
 
     private static String trim(String value, int maxLength) {

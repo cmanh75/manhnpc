@@ -111,6 +111,18 @@ function formatCountry(iso2: string): string {
   }
 }
 
+/** "Hanoi, VN" (from the backend's topCities label) → "🇻🇳 Hanoi" */
+function formatCity(label: string): string {
+  if (label === 'unknown') return 'unknown'
+  const [city, iso2] = label.split(', ')
+  if (!iso2 || iso2.length !== 2) return city
+  try {
+    return `${countryFlag(iso2)} ${city}`
+  } catch {
+    return city
+  }
+}
+
 export function AuditPage() {
   const owner = useAppStore((s) => s.owner)
   const [stats, setStats] = useState<VisitStats | null>(null)
@@ -184,12 +196,13 @@ export function AuditPage() {
             <VisitsChart data={chartData} />
           </div>
 
-          <div className="mb-6 grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+          <div className="mb-6 grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
             <RankedList title="top pages" entries={stats.topPaths} />
             <RankedList title="top referrers" entries={stats.topReferrers} />
             <RankedList title="browsers" entries={stats.browsers} />
             <RankedList title="operating systems" entries={stats.operatingSystems} />
             <RankedList title="top countries" entries={stats.topCountries} labelFor={formatCountry} />
+            <RankedList title="top cities" entries={stats.topCities} labelFor={formatCity} />
           </div>
 
           <div className="glass overflow-hidden rounded-2xl">
@@ -221,7 +234,7 @@ export function AuditPage() {
                   <tr className="text-faint">
                     <th className="px-5 py-2 font-normal">time</th>
                     <th className="px-5 py-2 font-normal">ip</th>
-                    <th className="px-5 py-2 font-normal">country</th>
+                    <th className="px-5 py-2 font-normal">location</th>
                     <th className="px-5 py-2 font-normal">path</th>
                     <th className="px-5 py-2 font-normal">browser / os</th>
                     <th className="px-5 py-2 font-normal">referrer</th>
@@ -232,7 +245,9 @@ export function AuditPage() {
                     <tr key={v.id} className="border-t border-white/5 text-muted">
                       <td className="whitespace-nowrap px-5 py-2">{new Date(v.createdAt).toLocaleString()}</td>
                       <td className="px-5 py-2">{v.ipAddress}</td>
-                      <td className="whitespace-nowrap px-5 py-2">{v.country ? countryFlag(v.country) : '—'}</td>
+                      <td className="whitespace-nowrap px-5 py-2">
+                        {v.country ? countryFlag(v.country) : ''} {v.city || (v.country ? '' : '—')}
+                      </td>
                       <td className="max-w-[180px] truncate px-5 py-2">{v.path}</td>
                       <td className="whitespace-nowrap px-5 py-2">{v.browser} / {v.os}</td>
                       <td className="max-w-[220px] truncate px-5 py-2">{v.referrer || '(direct)'}</td>

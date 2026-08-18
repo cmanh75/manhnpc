@@ -9,8 +9,9 @@ import org.springframework.boot.ApplicationRunner;
 import org.springframework.stereotype.Component;
 
 /**
- * One-time-per-boot catch-up: fills in {@code country} on visit_logs rows that predate
- * GeoIpService (or were left null because GeoIP wasn't configured yet at the time). Only
+ * One-time-per-boot catch-up: fills in {@code country}/{@code city} on visit_logs rows that
+ * predate GeoIpService, or were left null because GeoIP wasn't configured yet at the time (this
+ * also re-resolves rows that already had a country from before city lookups were added). Only
  * runs when a license key is actually set, so it's a no-op on every boot until then.
  */
 @Slf4j
@@ -30,19 +31,20 @@ public class GeoIpBackfillRunner implements ApplicationRunner {
         if (!geoIp.isConfigured()) {
             return;
         }
-        List<VisitLog> pending = visits.findByCountryIsNullAndIpAddressIsNotNull();
+        List<VisitLog> pending = visits.findByCityIsNullAndIpAddressIsNotNull();
         if (pending.isEmpty()) {
             return;
         }
         int resolved = 0;
         for (VisitLog visit : pending) {
-            String country = geoIp.countryCode(visit.getIpAddress()).orElse(null);
-            if (country != null) {
-                visit.setCountry(country);
+            GeoIpService.GeoLocation geo = geoIp.lookup(visit.getIpAddress()).orElse(null);
+            if (geo != null) {
+                visit.setCountry(geo.countryCode());
+                visit.setCity(geo.city());
                 resolved++;
             }
         }
         visits.saveAll(pending);
-        log.info("GeoIP backfill: resolved country for {}/{} existing visit logs", resolved, pending.size());
+        log.info("GeoIP backfill: resolved country/city for {}/{} existing visit logs", resolved, pending.size());
     }
 }

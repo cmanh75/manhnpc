@@ -98,6 +98,7 @@ export interface VisitLog {
   referrer: string | null
   language: string | null
   country: string | null
+  city: string | null
   createdAt: string
 }
 
@@ -123,5 +124,6 @@ export interface VisitStats {
   browsers: CountEntry[]
   operatingSystems: CountEntry[]
   topCountries: CountEntry[]
+  topCities: CountEntry[]
   visitsByDay: CountEntry[]
 }
