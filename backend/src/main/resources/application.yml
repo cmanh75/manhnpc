@@ -43,3 +43,8 @@ r2:
   secret-access-key: ${R2_SECRET_ACCESS_KEY:}
   bucket: ${R2_BUCKET:}
   public-base-url: ${R2_PUBLIC_BASE_URL:}
+
+geoip:
+  # free at maxmind.com/en/geolite2/signup — leave blank to disable country lookups on visit logs
+  license-key: ${GEOIP_LICENSE_KEY:}
+  database-path: ${GEOIP_DATABASE_PATH:./data/GeoLite2-Country.mmdb}

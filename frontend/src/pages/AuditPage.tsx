@@ -61,7 +61,15 @@ function VisitsChart({ data }: { data: { label: string; count: number }[] }) {
   )
 }
 
-function RankedList({ title, entries }: { title: string; entries: { label: string; count: number }[] }) {
+function RankedList({
+  title,
+  entries,
+  labelFor = (label) => label,
+}: {
+  title: string
+  entries: { label: string; count: number }[]
+  labelFor?: (label: string) => string
+}) {
   const max = Math.max(1, ...entries.map((e) => e.count))
   return (
     <div className="glass rounded-2xl p-5">
@@ -73,7 +81,7 @@ function RankedList({ title, entries }: { title: string; entries: { label: strin
           {entries.map((e) => (
             <div key={e.label}>
               <div className="mb-1 flex items-center justify-between gap-3 font-mono text-xs">
-                <span className="truncate text-muted">{e.label}</span>
+                <span className="truncate text-muted">{labelFor(e.label)}</span>
                 <span className="shrink-0 text-faint">{e.count}</span>
               </div>
               <div className="h-1 overflow-hidden rounded-full bg-white/5">
@@ -85,6 +93,22 @@ function RankedList({ title, entries }: { title: string; entries: { label: strin
       )}
     </div>
   )
+}
+
+const countryNames = new Intl.DisplayNames(['en'], { type: 'region' })
+
+/** ISO 3166-1 alpha-2 → flag emoji, via the regional-indicator-symbol trick (each letter A-Z maps to U+1F1E6..U+1F1FF). */
+function countryFlag(iso2: string): string {
+  return String.fromCodePoint(...[...iso2.toUpperCase()].map((c) => 0x1f1e6 + (c.charCodeAt(0) - 65)))
+}
+
+function formatCountry(iso2: string): string {
+  if (iso2 === 'unknown' || iso2.length !== 2) return 'unknown'
+  try {
+    return `${countryFlag(iso2)} ${countryNames.of(iso2) ?? iso2}`
+  } catch {
+    return iso2
+  }
 }
 
 export function AuditPage() {
@@ -160,11 +184,12 @@ export function AuditPage() {
             <VisitsChart data={chartData} />
           </div>
 
-          <div className="mb-6 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <div className="mb-6 grid gap-4 md:grid-cols-2 lg:grid-cols-5">
             <RankedList title="top pages" entries={stats.topPaths} />
             <RankedList title="top referrers" entries={stats.topReferrers} />
             <RankedList title="browsers" entries={stats.browsers} />
             <RankedList title="operating systems" entries={stats.operatingSystems} />
+            <RankedList title="top countries" entries={stats.topCountries} labelFor={formatCountry} />
           </div>
 
           <div className="glass overflow-hidden rounded-2xl">
@@ -196,6 +221,7 @@ export function AuditPage() {
                   <tr className="text-faint">
                     <th className="px-5 py-2 font-normal">time</th>
                     <th className="px-5 py-2 font-normal">ip</th>
+                    <th className="px-5 py-2 font-normal">country</th>
                     <th className="px-5 py-2 font-normal">path</th>
                     <th className="px-5 py-2 font-normal">browser / os</th>
                     <th className="px-5 py-2 font-normal">referrer</th>
@@ -206,6 +232,7 @@ export function AuditPage() {
                     <tr key={v.id} className="border-t border-white/5 text-muted">
                       <td className="whitespace-nowrap px-5 py-2">{new Date(v.createdAt).toLocaleString()}</td>
                       <td className="px-5 py-2">{v.ipAddress}</td>
+                      <td className="whitespace-nowrap px-5 py-2">{v.country ? countryFlag(v.country) : '—'}</td>
                       <td className="max-w-[180px] truncate px-5 py-2">{v.path}</td>
                       <td className="whitespace-nowrap px-5 py-2">{v.browser} / {v.os}</td>
                       <td className="max-w-[220px] truncate px-5 py-2">{v.referrer || '(direct)'}</td>

@@ -18,4 +18,6 @@ public interface VisitLogRepository extends JpaRepository<VisitLog, Long> {
     long countDistinctIpAddress();
 
     long countByCreatedAtAfter(LocalDateTime after);
+
+    List<VisitLog> findByCountryIsNullAndIpAddressIsNotNull();
 }

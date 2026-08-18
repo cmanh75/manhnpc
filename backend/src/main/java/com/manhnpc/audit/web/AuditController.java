@@ -1,5 +1,6 @@
 package com.manhnpc.audit.web;
 
+import com.manhnpc.audit.geo.GeoIpService;
 import com.manhnpc.audit.model.VisitLog;
 import com.manhnpc.audit.repository.VisitLogRepository;
 import com.manhnpc.common.security.OwnerRequests;
@@ -36,13 +37,15 @@ public class AuditController {
     public record VisitStats(long totalVisits, long uniqueIps, long visitsToday, long visitsLast30Days,
                              List<CountEntry> topPaths, List<CountEntry> topReferrers,
                              List<CountEntry> browsers, List<CountEntry> operatingSystems,
-                             List<CountEntry> visitsByDay) {
+                             List<CountEntry> topCountries, List<CountEntry> visitsByDay) {
     }
 
     private final VisitLogRepository visits;
+    private final GeoIpService geoIp;
 
-    public AuditController(VisitLogRepository visits) {
+    public AuditController(VisitLogRepository visits, GeoIpService geoIp) {
         this.visits = visits;
+        this.geoIp = geoIp;
     }
 
     /** Public — called once per page view from the frontend. IP/User-Agent are read from the request itself, not client-supplied. */
@@ -61,6 +64,7 @@ public class AuditController {
                 .path(trim(body != null && body.path() != null && !body.path().isBlank() ? body.path() : "/", 300))
                 .referrer(trim(body != null ? body.referrer() : null, 500))
                 .language(trim(body != null ? body.language() : request.getHeader("Accept-Language"), 40))
+                .country(geoIp.countryCode(ip).orElse(null))
                 .build();
         visits.save(log);
     }
@@ -88,6 +92,7 @@ public class AuditController {
                 topOf(recent, v -> v.getReferrer() == null || v.getReferrer().isBlank() ? "(direct)" : v.getReferrer(), 10),
                 topOf(recent, v -> v.getBrowser() == null ? "unknown" : v.getBrowser(), 10),
                 topOf(recent, v -> v.getOs() == null ? "unknown" : v.getOs(), 10),
+                topOf(recent, v -> v.getCountry() == null ? "unknown" : v.getCountry(), 10),
                 byDay(recent));
     }
 
