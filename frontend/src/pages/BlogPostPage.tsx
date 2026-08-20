@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { motion, useScroll, useSpring } from 'framer-motion'
 import Markdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { ArrowLeft, Clock, Eye, Calendar, Trash2 } from 'lucide-react'
 import { PageShell } from '../components/ui'
 import { api } from '../lib/api'
@@ -110,7 +111,7 @@ export function BlogPostPage() {
           </div>
 
           <div className="prose-dev mx-auto max-w-3xl text-[15.5px]">
-            <Markdown>{post.content}</Markdown>
+            <Markdown remarkPlugins={[remarkGfm]}>{post.content}</Markdown>
           </div>
 
           <footer className="mx-auto mt-16 max-w-3xl border-t border-white/8 pt-8">

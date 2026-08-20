@@ -247,6 +247,21 @@ body {
 }
 .prose-dev img { @apply rounded-xl my-6; }
 .prose-dev hr { @apply border-white/10 my-8; }
+.prose-dev table {
+  @apply my-6 block w-full overflow-x-auto border-collapse rounded-xl text-sm;
+}
+.prose-dev thead {
+  @apply bg-white/5;
+}
+.prose-dev th {
+  @apply border border-white/10 px-3 py-2 text-left font-display font-semibold text-ink;
+}
+.prose-dev td {
+  @apply border border-white/10 px-3 py-2 align-top text-ink/85;
+}
+.prose-dev tbody tr:nth-child(even) {
+  @apply bg-white/[0.02];
+}
 .prose-dev .katex-display {
   @apply my-6 overflow-x-auto overflow-y-hidden py-1;
 }

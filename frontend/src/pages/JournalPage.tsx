@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import Markdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'
 import rehypeKatex from 'rehype-katex'
 import 'katex/dist/katex.min.css'
@@ -293,7 +294,7 @@ export function JournalPage() {
         {showPreview ? (
           <div className="prose-dev glass min-h-[55svh] w-full overflow-y-auto rounded-2xl p-5 text-[15px]">
             {draft.content.trim() ? (
-              <Markdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
+              <Markdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
                 {draft.content}
               </Markdown>
             ) : (
