@@ -19,6 +19,7 @@ services:
       R2_BUCKET: ${R2_BUCKET}
       R2_PUBLIC_BASE_URL: ${R2_PUBLIC_BASE_URL}
       GEOIP_LICENSE_KEY: ${GEOIP_LICENSE_KEY}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
     volumes:
       - app_data:/app/data
     networks:

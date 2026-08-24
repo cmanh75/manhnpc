@@ -48,3 +48,10 @@ geoip:
   # free at maxmind.com/en/geolite2/signup — leave blank to disable country/city lookups on visit logs
   license-key: ${GEOIP_LICENSE_KEY:}
   database-path: ${GEOIP_DATABASE_PATH:./data/GeoLite2-City.mmdb}
+
+openai:
+  # leave blank to disable the journal AI-report feature locally
+  api-key: ${OPENAI_API_KEY:}
+  model: ${OPENAI_MODEL:gpt-4o-mini}
+  base-url: ${OPENAI_BASE_URL:https://api.openai.com/v1}
+  timeout-ms: ${OPENAI_TIMEOUT_MS:30000}

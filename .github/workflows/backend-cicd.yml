@@ -46,6 +46,7 @@ jobs:
           R2_BUCKET: ci-placeholder
           R2_PUBLIC_BASE_URL: https://ci-placeholder.example.com
           GEOIP_LICENSE_KEY: ci-placeholder
+          OPENAI_API_KEY: ci-placeholder
         run: docker compose -f docker-compose.prod.yml config --quiet
 
   deploy:
@@ -87,12 +88,13 @@ jobs:
           R2_BUCKET: ${{ secrets.R2_BUCKET }}
           R2_PUBLIC_BASE_URL: ${{ secrets.R2_PUBLIC_BASE_URL }}
           GEOIP_LICENSE_KEY: ${{ secrets.GEOIP_LICENSE_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           password: ${{ secrets.VPS_PASSWORD }}
           port: ${{ secrets.VPS_PORT }}
-          envs: JWT_SECRET,OWNER_PASSWORD,R2_ACCOUNT_ID,R2_ACCESS_KEY_ID,R2_SECRET_ACCESS_KEY,R2_BUCKET,R2_PUBLIC_BASE_URL,GEOIP_LICENSE_KEY
+          envs: JWT_SECRET,OWNER_PASSWORD,R2_ACCOUNT_ID,R2_ACCESS_KEY_ID,R2_SECRET_ACCESS_KEY,R2_BUCKET,R2_PUBLIC_BASE_URL,GEOIP_LICENSE_KEY,OPENAI_API_KEY
           command_timeout: 20m
           script: |
             set -eu
@@ -112,6 +114,7 @@ jobs:
               printf 'R2_BUCKET=%s\n' "$R2_BUCKET"
               printf 'R2_PUBLIC_BASE_URL=%s\n' "$R2_PUBLIC_BASE_URL"
               printf 'GEOIP_LICENSE_KEY=%s\n' "$GEOIP_LICENSE_KEY"
+              printf 'OPENAI_API_KEY=%s\n' "$OPENAI_API_KEY"
             } > "$BACKEND/.env"
 
             docker network inspect english-supporter-backend_default >/dev/null
@@ -148,4 +151,4 @@ jobs:
             echo "--- app logs (last 150 lines) ---"
             docker compose -f "$BACKEND/docker-compose.prod.yml" logs app --tail 150 || true
 
-            unset JWT_SECRET OWNER_PASSWORD R2_ACCOUNT_ID R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY R2_BUCKET R2_PUBLIC_BASE_URL GEOIP_LICENSE_KEY
+            unset JWT_SECRET OWNER_PASSWORD R2_ACCOUNT_ID R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY R2_BUCKET R2_PUBLIC_BASE_URL GEOIP_LICENSE_KEY OPENAI_API_KEY

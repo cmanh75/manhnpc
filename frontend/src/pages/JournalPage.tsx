@@ -5,7 +5,7 @@ import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'
 import rehypeKatex from 'rehype-katex'
 import 'katex/dist/katex.min.css'
-import { Lock, Plus, Trash2, Save, X, Calendar, ArrowLeft, Bold, Italic, Heading2, List, Image as ImageIcon, Sigma, Eye, Pencil } from 'lucide-react'
+import { Lock, Plus, Trash2, Save, X, Calendar, ArrowLeft, Bold, Italic, Heading2, List, Image as ImageIcon, Sigma, Eye, Pencil, Sparkles, Loader2, ArrowDownToLine, Replace } from 'lucide-react'
 import { PageShell, SectionHeading, Reveal } from '../components/ui'
 import { journal, type JournalEntryInput } from '../lib/api'
 import type { JournalEntry } from '../lib/types'
@@ -56,8 +56,43 @@ export function JournalPage() {
   const [saving, setSaving] = useState(false)
   const [uploadingImage, setUploadingImage] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
+  const [showAiPanel, setShowAiPanel] = useState(false)
+  const [aiNotes, setAiNotes] = useState('')
+  const [aiReport, setAiReport] = useState<string | null>(null)
+  const [aiGenerating, setAiGenerating] = useState(false)
+  const [aiError, setAiError] = useState<string | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  function resetAiPanel() {
+    setShowAiPanel(false)
+    setAiNotes('')
+    setAiReport(null)
+    setAiError(null)
+  }
+
+  async function generateAiReport() {
+    if (!aiNotes.trim()) return
+    setAiGenerating(true)
+    setAiError(null)
+    try {
+      const report = await journal.generateAiReport(aiNotes, draft.entryDate)
+      setAiReport(report)
+    } catch {
+      setAiError('could not generate report — check the OpenAI key on the server')
+    } finally {
+      setAiGenerating(false)
+    }
+  }
+
+  function useAiReport(mode: 'replace' | 'append') {
+    if (!aiReport) return
+    setDraft((d) => ({
+      ...d,
+      content: mode === 'replace' || !d.content.trim() ? aiReport : `${d.content}\n\n${aiReport}`,
+    }))
+    resetAiPanel()
+  }
 
   function applyEdit(fn: (ta: HTMLTextAreaElement) => { next: string; cursor: number }) {
     const ta = textareaRef.current
@@ -121,6 +156,7 @@ export function JournalPage() {
     setDraft(emptyDraft())
     setTagsInput('')
     setShowPreview(false)
+    resetAiPanel()
     setView('editor')
   }
 
@@ -129,6 +165,7 @@ export function JournalPage() {
     setDraft({ title: entry.title, content: entry.content, tags: entry.tags, entryDate: entry.entryDate })
     setTagsInput(entry.tags.join(', '))
     setShowPreview(false)
+    resetAiPanel()
     setView('editor')
   }
 
@@ -277,6 +314,20 @@ export function JournalPage() {
               e.target.value = ''
             }}
           />
+          <div className="mx-1 h-5 w-px bg-white/10" />
+          <button
+            type="button"
+            title="Generate an AI report from today's notes"
+            disabled={showPreview}
+            onClick={() => setShowAiPanel((v) => !v)}
+            className={clsx(
+              'flex items-center gap-1.5 rounded-lg px-2.5 py-2 font-mono text-[11px] transition disabled:opacity-40',
+              showAiPanel ? 'bg-violet/15 text-violet' : 'text-muted hover:bg-white/8 hover:text-ink',
+            )}
+          >
+            <Sparkles size={14} />
+            ai report
+          </button>
           <button
             type="button"
             title={showPreview ? 'Back to editing' : 'Preview rendered markdown + LaTeX'}
@@ -290,6 +341,69 @@ export function JournalPage() {
             {showPreview ? 'write' : 'preview'}
           </button>
         </div>
+
+        {showAiPanel && (
+          <div className="glass mb-4 rounded-2xl p-4">
+            <p className="mb-2 flex items-center gap-1.5 font-mono text-xs text-violet">
+              <Sparkles size={13} /> ai report
+            </p>
+            {aiReport === null ? (
+              <>
+                <textarea
+                  value={aiNotes}
+                  onChange={(e) => setAiNotes(e.target.value)}
+                  placeholder="Tổng hợp những gì bạn học được hôm nay (chủ đề, khái niệm, ví dụ, v.v.) — AI sẽ đánh giá và viết thành báo cáo…"
+                  className="min-h-28 w-full resize-y rounded-xl bg-black/20 p-3 font-mono text-sm outline-none placeholder:text-faint focus:ring-1 focus:ring-violet/50"
+                />
+                {aiError && <p className="mt-2 font-mono text-xs text-pink">{aiError}</p>}
+                <div className="mt-3 flex items-center gap-2">
+                  <button
+                    onClick={generateAiReport}
+                    disabled={aiGenerating || !aiNotes.trim()}
+                    className="inline-flex items-center gap-2 rounded-lg bg-violet/15 px-4 py-2 font-mono text-xs font-semibold text-violet transition enabled:hover:bg-violet/25 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    {aiGenerating ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
+                    {aiGenerating ? 'generating…' : 'generate report'}
+                  </button>
+                  <button
+                    onClick={resetAiPanel}
+                    className="font-mono text-xs text-muted transition hover:text-ink"
+                  >
+                    cancel
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <textarea
+                  value={aiReport}
+                  onChange={(e) => setAiReport(e.target.value)}
+                  className="min-h-48 w-full resize-y rounded-xl bg-black/20 p-3 font-mono text-sm outline-none focus:ring-1 focus:ring-violet/50"
+                />
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <button
+                    onClick={() => useAiReport('append')}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-white/8 px-3 py-2 font-mono text-xs text-ink ring-1 ring-white/15 transition hover:bg-white/12"
+                  >
+                    <ArrowDownToLine size={13} /> append to content
+                  </button>
+                  <button
+                    onClick={() => useAiReport('replace')}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-cyan to-violet px-3 py-2 font-mono text-xs font-semibold text-void transition hover:shadow-[0_0_20px_-6px_#a855f7]"
+                  >
+                    <Replace size={13} /> replace content
+                  </button>
+                  <button
+                    onClick={() => setAiReport(null)}
+                    className="font-mono text-xs text-muted transition hover:text-ink"
+                  >
+                    back
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
 
         {showPreview ? (
           <div className="prose-dev glass min-h-[55svh] w-full overflow-y-auto rounded-2xl p-5 text-[15px]">
