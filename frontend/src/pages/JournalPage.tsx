@@ -49,7 +49,7 @@ export function JournalPage() {
   const [entries, setEntries] = useState<JournalEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [view, setView] = useState<'list' | 'editor'>('list')
+  const [view, setView] = useState<'list' | 'reader' | 'editor'>('list')
   const [editing, setEditing] = useState<JournalEntry | null>(null)
   const [draft, setDraft] = useState<JournalEntryInput>(emptyDraft())
   const [tagsInput, setTagsInput] = useState('')
@@ -160,6 +160,11 @@ export function JournalPage() {
     setView('editor')
   }
 
+  function openView(entry: JournalEntry) {
+    setEditing(entry)
+    setView('reader')
+  }
+
   function openEdit(entry: JournalEntry) {
     setEditing(entry)
     setDraft({ title: entry.title, content: entry.content, tags: entry.tags, entryDate: entry.entryDate })
@@ -176,12 +181,14 @@ export function JournalPage() {
       tags: tagsInput.split(',').map((t) => t.trim()).filter(Boolean),
     }
     try {
+      const wasEditing = editing !== null
       const saved = editing ? await journal.update(editing.id, payload) : await journal.create(payload)
       setEntries((prev) => {
-        const next = editing ? prev.map((e) => (e.id === saved.id ? saved : e)) : [saved, ...prev]
+        const next = wasEditing ? prev.map((e) => (e.id === saved.id ? saved : e)) : [saved, ...prev]
         return [...next].sort((a, b) => b.entryDate.localeCompare(a.entryDate) || b.id - a.id)
       })
-      setView('list')
+      setEditing(saved)
+      setView(wasEditing ? 'reader' : 'list')
     } catch {
       setError('could not save entry')
     } finally {
@@ -201,11 +208,55 @@ export function JournalPage() {
     }
   }
 
-  if (view === 'editor') {
+  if (view === 'reader' && editing) {
+    const entry = editing
     return (
       <PageShell>
         <button
           onClick={() => setView('list')}
+          className="group mb-8 inline-flex items-center gap-2 font-mono text-sm text-muted transition hover:text-cyan"
+        >
+          <ArrowLeft size={14} className="transition group-hover:-translate-x-1" />
+          cd ../journal
+        </button>
+
+        <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="font-display text-2xl font-bold leading-snug tracking-tight">{entry.title}</h1>
+            <p className="mt-2 flex items-center gap-1.5 font-mono text-xs text-faint">
+              <Calendar size={12} />
+              {formatDate(entry.entryDate)}
+            </p>
+            {entry.tags.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {entry.tags.map((t) => (
+                  <span key={t} className="rounded-md bg-violet/10 px-2 py-0.5 font-mono text-[10px] text-violet">#{t}</span>
+                ))}
+              </div>
+            )}
+          </div>
+          <button
+            onClick={() => openEdit(entry)}
+            className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-white/8 px-4 py-2.5 font-mono text-sm text-ink ring-1 ring-white/15 transition hover:bg-white/12"
+          >
+            <Pencil size={14} /> edit
+          </button>
+        </div>
+
+        <div className="prose-dev glass w-full rounded-2xl p-5 text-[15px]">
+          <Markdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
+            {entry.content}
+          </Markdown>
+        </div>
+      </PageShell>
+    )
+  }
+
+  if (view === 'editor') {
+    return (
+      <PageShell>
+        <button
+          onClick={() => setView(editing ? 'reader' : 'list')}
           className="group mb-8 inline-flex items-center gap-2 font-mono text-sm text-muted transition hover:text-cyan"
         >
           <ArrowLeft size={14} className="transition group-hover:-translate-x-1" />
@@ -453,7 +504,7 @@ export function JournalPage() {
             {saving ? 'saving…' : 'save'}
           </button>
           <button
-            onClick={() => setView('list')}
+            onClick={() => setView(editing ? 'reader' : 'list')}
             className="inline-flex items-center gap-2 rounded-xl bg-white/8 px-5 py-2.5 font-mono text-sm text-ink ring-1 ring-white/15 transition hover:bg-white/12"
           >
             <X size={14} /> cancel
@@ -503,7 +554,7 @@ export function JournalPage() {
           {entries.map((entry, i) => (
             <Reveal key={entry.id} delay={(i % 4) * 0.05}>
               <button
-                onClick={() => openEdit(entry)}
+                onClick={() => openView(entry)}
                 className="border-beam glass group flex w-full flex-col gap-2 rounded-2xl p-5 text-left transition hover:bg-white/[0.06]"
               >
                 <div className="flex flex-wrap items-center gap-3 font-mono text-[11px] text-faint">
