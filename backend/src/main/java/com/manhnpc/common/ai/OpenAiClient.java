@@ -46,6 +46,11 @@ public class OpenAiClient {
 
     /** Sends a single system+user turn to the chat completions endpoint and returns the assistant's text. */
     public String chat(String systemPrompt, String userPrompt) {
+        return chat(systemPrompt, userPrompt, 2000);
+    }
+
+    /** Same as {@link #chat(String, String)} but with an explicit output token budget. */
+    public String chat(String systemPrompt, String userPrompt, int maxTokens) {
         if (apiKey.isBlank()) {
             throw new IllegalStateException("OPENAI_API_KEY is not configured");
         }
@@ -53,6 +58,7 @@ public class OpenAiClient {
         ObjectNode body = mapper.createObjectNode();
         body.put("model", model);
         body.put("temperature", 0.6);
+        body.put("max_tokens", maxTokens);
         ArrayNode messages = body.putArray("messages");
         messages.addObject().put("role", "system").put("content", systemPrompt);
         messages.addObject().put("role", "user").put("content", userPrompt);

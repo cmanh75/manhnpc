@@ -18,24 +18,32 @@ import org.springframework.web.bind.annotation.RestController;
 public class JournalAiReportController {
 
     private static final String SYSTEM_PROMPT = """
-            Bạn là trợ lý viết nhật ký học tập. Người dùng sẽ cung cấp ghi chú thô về những gì \
-            họ đã học/làm trong ngày (có thể lộn xộn, gạch đầu dòng, chưa chỉnh sửa). Dựa trên đó, \
-            hãy viết một bản báo cáo nhật ký bằng tiếng Việt, định dạng Markdown, gồm đúng các phần sau:
+            You are a study-journal assistant. The user will give you raw notes about what they \
+            learned/did today (possibly messy, bullet-point, unedited). Turn those notes into a \
+            detailed daily report in English, formatted as Markdown, with exactly these sections:
 
-            ## Tóm tắt
-            Tóm tắt ngắn gọn (2-4 câu) nội dung đã học/làm trong ngày.
+            ## Summary
+            2-4 sentences giving the high-level picture of the day.
 
-            ## Nội dung chi tiết
-            Trình bày lại kiến thức/chủ đề đã học một cách có tổ chức, dùng tiêu đề phụ hoặc gạch đầu dòng.
+            ## Detailed breakdown
+            Go through every topic/concept/task from the notes in depth, one by one, using \
+            subheadings or bullet points. Preserve every concrete detail the user wrote (specific \
+            terms, numbers, examples, code, names) — do not compress or generalize them away. Only \
+            omit content that is genuinely irrelevant filler (e.g. "then I took a break"), not \
+            substance. When a note is terse, expand on it with the relevant context/explanation \
+            instead of just restating it in fewer words.
 
-            ## Đánh giá
-            Nhận xét khách quan về mức độ hiểu, điểm mạnh, và những chỗ còn mơ hồ cần ôn lại.
+            ## Assessment
+            Objective evaluation of understanding: strengths, gaps, and anything still unclear that \
+            needs review.
 
-            ## Thống kê
-            Liệt kê: số chủ đề/khái niệm đã học, mức độ khó tổng quan (Dễ/Trung bình/Khó), \
-            và đề xuất nên dành bao nhiêu thời gian ôn lại trong vài ngày tới.
+            ## Statistics
+            List: number of topics/concepts covered, overall difficulty (Easy/Medium/Hard), and a \
+            suggested review schedule for the next few days.
 
-            Chỉ trả về nội dung Markdown của báo cáo, không thêm lời chào hay giải thích nào khác.
+            Be thorough rather than brief — this is a reference report the user will read back later, \
+            so don't cut corners on detail. Return only the Markdown content of the report, no greeting \
+            or extra commentary.
             """;
 
     private final OpenAiClient openAiClient;
@@ -54,8 +62,8 @@ public class JournalAiReportController {
             throw new BadRequestException("notes must not be empty");
         }
         LocalDate date = request.entryDate() != null ? request.entryDate() : LocalDate.now();
-        String userPrompt = "Ngày: " + date + "\n\nGhi chú của tôi:\n" + request.notes();
-        String report = openAiClient.chat(SYSTEM_PROMPT, userPrompt);
+        String userPrompt = "Date: " + date + "\n\nMy notes:\n" + request.notes();
+        String report = openAiClient.chat(SYSTEM_PROMPT, userPrompt, 4000);
         return new AiReportResponse(report);
     }
 }
