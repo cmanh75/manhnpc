@@ -353,6 +353,7 @@ export function JournalPage() {
                   value={aiNotes}
                   onChange={(e) => setAiNotes(e.target.value)}
                   placeholder="Tổng hợp những gì bạn học được hôm nay (chủ đề, khái niệm, ví dụ, v.v.) — AI sẽ đánh giá và viết thành báo cáo…"
+                  data-lenis-prevent
                   className="min-h-28 w-full resize-y rounded-xl bg-black/20 p-3 font-mono text-sm outline-none placeholder:text-faint focus:ring-1 focus:ring-violet/50"
                 />
                 {aiError && <p className="mt-2 font-mono text-xs text-pink">{aiError}</p>}
@@ -378,7 +379,8 @@ export function JournalPage() {
                 <textarea
                   value={aiReport}
                   onChange={(e) => setAiReport(e.target.value)}
-                  className="min-h-48 w-full resize-y rounded-xl bg-black/20 p-3 font-mono text-sm outline-none focus:ring-1 focus:ring-violet/50"
+                  data-lenis-prevent
+                  className="min-h-48 max-h-[60svh] w-full resize-y overflow-y-auto rounded-xl bg-black/20 p-3 font-mono text-sm outline-none focus:ring-1 focus:ring-violet/50"
                 />
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   <button
@@ -406,7 +408,7 @@ export function JournalPage() {
         )}
 
         {showPreview ? (
-          <div className="prose-dev glass min-h-[55svh] w-full overflow-y-auto rounded-2xl p-5 text-[15px]">
+          <div className="prose-dev glass min-h-[55svh] w-full overflow-y-auto rounded-2xl p-5 text-[15px]" data-lenis-prevent>
             {draft.content.trim() ? (
               <Markdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
                 {draft.content}
@@ -434,6 +436,7 @@ export function JournalPage() {
               }
             }}
             placeholder="# markdown goes here… ($inline$ or $$block$$ LaTeX math, drag/paste images)"
+            data-lenis-prevent
             className="glass min-h-[55svh] w-full resize-none rounded-2xl p-5 font-mono text-sm outline-none placeholder:text-faint focus:ring-1 focus:ring-cyan/50"
           />
         )}
