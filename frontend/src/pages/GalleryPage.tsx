@@ -542,7 +542,6 @@ function MediaGroupCarousel({
   // auto-advance stops for good — it's only meant to catch the eye of someone scrolling past.
   const [userInteracted, setUserInteracted] = useState(false)
   const musicUrl = members.map((m) => (m.kind === 'photo' ? m.photo.musicUrl : m.video.musicUrl)).find(Boolean) ?? null
-  const activeIsVideo = members[active]?.kind === 'video'
 
   function handleScroll() {
     const el = trackRef.current
@@ -580,7 +579,10 @@ function MediaGroupCarousel({
 
   return (
     <div ref={containerRef} className="relative aspect-[4/5] w-full overflow-hidden bg-black">
-      {musicUrl && <BackgroundMusic url={musicUrl} suppressed={activeIsVideo || viewerOpen} />}
+      {/* keeps playing through a video slide in the feed carousel on purpose — it only pauses
+          once the visitor actually clicks in to watch (fullscreen viewer open), not just while
+          idly scrolled to a video thumbnail. */}
+      {musicUrl && <BackgroundMusic url={musicUrl} suppressed={viewerOpen} />}
       <div
         ref={trackRef}
         onScroll={handleScroll}
