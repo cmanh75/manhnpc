@@ -3,6 +3,8 @@ package com.manhnpc.journal.web;
 import com.manhnpc.common.ai.OpenAiClient;
 import com.manhnpc.common.web.error.BadRequestException;
 import java.time.LocalDate;
+import java.util.Arrays;
+import java.util.List;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -19,13 +21,17 @@ public class JournalAiReportController {
 
     private static final String SYSTEM_PROMPT = """
             You are a study-journal assistant. The user will give you raw notes about what they \
-            learned/did today (possibly messy, bullet-point, unedited). Respond with exactly two parts, \
-            in this order:
+            learned/did today (possibly messy, bullet-point, unedited). Respond with exactly three \
+            parts, in this order:
 
             1. A single line starting with "Title: " followed by a short, specific, descriptive title \
             (English, no surrounding quotes, no trailing period, ideally under 60 characters) that \
             captures the main topic(s) of the day's notes.
-            2. A blank line, then turn the notes into a detailed daily report in English, formatted as \
+            2. A single line starting with "Tags: " followed by 3-6 short lowercase keyword tags, \
+            comma-separated (e.g. "spring-boot, jpa, database-indexing"), covering the concrete \
+            topics/technologies/subjects present in the notes. No hashes, no spaces inside a tag \
+            (use hyphens), no surrounding quotes.
+            3. A blank line, then turn the notes into a detailed daily report in English, formatted as \
             Markdown, with exactly these sections:
 
             ## Summary
@@ -60,7 +66,7 @@ public class JournalAiReportController {
 
     public record AiReportRequest(String notes, LocalDate entryDate) {}
 
-    public record AiReportResponse(String title, String report) {}
+    public record AiReportResponse(String title, List<String> tags, String report) {}
 
     @PostMapping
     public AiReportResponse generate(@RequestBody AiReportRequest request) {
@@ -70,18 +76,32 @@ public class JournalAiReportController {
         LocalDate date = request.entryDate() != null ? request.entryDate() : LocalDate.now();
         String userPrompt = "Date: " + date + "\n\nMy notes:\n" + request.notes();
         String raw = openAiClient.chat(SYSTEM_PROMPT, userPrompt, 4000);
-        return splitTitleAndReport(raw);
+        return parseAiResponse(raw);
     }
 
-    /** Pulls the leading "Title: ..." line off the model's response, if present. */
-    private static AiReportResponse splitTitleAndReport(String raw) {
-        int newline = raw.indexOf('\n');
-        String firstLine = newline >= 0 ? raw.substring(0, newline) : raw;
-        if (firstLine.regionMatches(true, 0, "Title:", 0, 6)) {
-            String title = firstLine.substring(6).trim();
-            String report = newline >= 0 ? raw.substring(newline + 1).stripLeading() : "";
-            return new AiReportResponse(title, report);
+    /** Pulls the leading "Title: ..." / "Tags: ..." header lines off the model's response, if present. */
+    private static AiReportResponse parseAiResponse(String raw) {
+        String title = null;
+        List<String> tags = null;
+        String remaining = raw;
+
+        while (title == null || tags == null) {
+            int newline = remaining.indexOf('\n');
+            String firstLine = newline >= 0 ? remaining.substring(0, newline) : remaining;
+            String rest = newline >= 0 ? remaining.substring(newline + 1) : "";
+            if (title == null && firstLine.regionMatches(true, 0, "Title:", 0, 6)) {
+                title = firstLine.substring(6).trim();
+                remaining = rest;
+            } else if (tags == null && firstLine.regionMatches(true, 0, "Tags:", 0, 5)) {
+                tags = Arrays.stream(firstLine.substring(5).split(","))
+                        .map(String::trim)
+                        .filter(s -> !s.isEmpty())
+                        .toList();
+                remaining = rest;
+            } else {
+                break;
+            }
         }
-        return new AiReportResponse(null, raw);
+        return new AiReportResponse(title, tags, remaining.stripLeading());
     }
 }

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -56,10 +56,12 @@ export function JournalPage() {
   const [saving, setSaving] = useState(false)
   const [uploadingImage, setUploadingImage] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
+  const [tagFilter, setTagFilter] = useState<string | null>(null)
   const [showAiPanel, setShowAiPanel] = useState(false)
   const [aiNotes, setAiNotes] = useState('')
   const [aiReport, setAiReport] = useState<string | null>(null)
   const [aiTitle, setAiTitle] = useState<string | null>(null)
+  const [aiTags, setAiTags] = useState<string | null>(null)
   const [aiGenerating, setAiGenerating] = useState(false)
   const [aiError, setAiError] = useState<string | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -70,6 +72,7 @@ export function JournalPage() {
     setAiNotes('')
     setAiReport(null)
     setAiTitle(null)
+    setAiTags(null)
     setAiError(null)
   }
 
@@ -78,9 +81,10 @@ export function JournalPage() {
     setAiGenerating(true)
     setAiError(null)
     try {
-      const { title, report } = await journal.generateAiReport(aiNotes, draft.entryDate)
+      const { title, tags, report } = await journal.generateAiReport(aiNotes, draft.entryDate)
       setAiReport(report)
       setAiTitle(title)
+      setAiTags(tags.length ? tags.join(', ') : null)
     } catch {
       setAiError('could not generate report — check the OpenAI key on the server')
     } finally {
@@ -95,6 +99,7 @@ export function JournalPage() {
       title: aiTitle?.trim() ? aiTitle.trim() : d.title,
       content: mode === 'replace' || !d.content.trim() ? aiReport : `${d.content}\n\n${aiReport}`,
     }))
+    if (aiTags?.trim()) setTagsInput(aiTags.trim())
     resetAiPanel()
   }
 
@@ -136,6 +141,17 @@ export function JournalPage() {
       .catch(() => setError('could not load journal entries'))
       .finally(() => setLoading(false))
   }, [owner])
+
+  const tagCounts = useMemo(() => {
+    const counts = new Map<string, number>()
+    entries.forEach((e) => e.tags.forEach((t) => counts.set(t, (counts.get(t) ?? 0) + 1)))
+    return [...counts.entries()].sort((a, b) => b[1] - a[1])
+  }, [entries])
+
+  const filteredEntries = useMemo(
+    () => (tagFilter ? entries.filter((e) => e.tags.includes(tagFilter)) : entries),
+    [entries, tagFilter],
+  )
 
   if (!owner) {
     return (
@@ -439,6 +455,14 @@ export function JournalPage() {
                     className="mb-2 w-full rounded-xl bg-black/20 p-3 font-mono text-sm font-semibold outline-none focus:ring-1 focus:ring-violet/50"
                   />
                 )}
+                {aiTags !== null && (
+                  <input
+                    value={aiTags}
+                    onChange={(e) => setAiTags(e.target.value)}
+                    placeholder="AI-generated tags, comma, separated"
+                    className="mb-2 w-full rounded-xl bg-black/20 p-3 font-mono text-xs text-violet outline-none focus:ring-1 focus:ring-violet/50"
+                  />
+                )}
                 <textarea
                   value={aiReport}
                   onChange={(e) => setAiReport(e.target.value)}
@@ -542,7 +566,7 @@ export function JournalPage() {
         sub="Private notes on what I learned today — only visible to me."
       />
 
-      <div className="mb-8">
+      <div className="mb-6">
         <button
           onClick={openNew}
           className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-cyan to-violet px-5 py-2.5 font-mono text-sm font-semibold text-void transition hover:shadow-[0_0_24px_-6px_#22d3ee]"
@@ -550,6 +574,32 @@ export function JournalPage() {
           <Plus size={14} /> new entry
         </button>
       </div>
+
+      {tagCounts.length > 0 && (
+        <div className="mb-8 flex flex-wrap gap-2">
+          <button
+            onClick={() => setTagFilter(null)}
+            className={clsx(
+              'rounded-lg px-3 py-1 font-mono text-xs transition',
+              !tagFilter ? 'bg-violet/15 text-violet ring-1 ring-violet/40' : 'glass text-muted hover:text-ink',
+            )}
+          >
+            all
+          </button>
+          {tagCounts.map(([t, count]) => (
+            <button
+              key={t}
+              onClick={() => setTagFilter(tagFilter === t ? null : t)}
+              className={clsx(
+                'rounded-lg px-3 py-1 font-mono text-xs transition',
+                tagFilter === t ? 'bg-violet/15 text-violet ring-1 ring-violet/40' : 'glass text-muted hover:text-ink',
+              )}
+            >
+              #{t} <span className="text-[10px] text-faint">{count}</span>
+            </button>
+          ))}
+        </div>
+      )}
 
       {error && <p className="mb-4 font-mono text-xs text-pink">{error}</p>}
 
@@ -559,11 +609,13 @@ export function JournalPage() {
             <div key={i} className="skeleton h-24 w-full rounded-2xl" />
           ))}
         </div>
-      ) : entries.length === 0 ? (
-        <div className="py-20 text-center font-mono text-sm text-faint">// no entries yet — write your first one</div>
+      ) : filteredEntries.length === 0 ? (
+        <div className="py-20 text-center font-mono text-sm text-faint">
+          {entries.length === 0 ? '// no entries yet — write your first one' : `// no entries tagged #${tagFilter}`}
+        </div>
       ) : (
         <div className="space-y-4">
-          {entries.map((entry, i) => (
+          {filteredEntries.map((entry, i) => (
             <Reveal key={entry.id} delay={(i % 4) * 0.05}>
               <button
                 onClick={() => openView(entry)}
