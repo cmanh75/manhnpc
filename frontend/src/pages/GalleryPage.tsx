@@ -36,6 +36,29 @@ if (typeof window !== 'undefined') {
   window.addEventListener('keydown', unlockAudio, true)
 }
 
+/**
+ * Guarantees at most one feed background track (BackgroundMusic instance) ever plays at once,
+ * site-wide — a structural backstop against the "in view" IntersectionObserver bands of adjacent
+ * cards briefly overlapping (a tall photo card can still count as "in view" for a while after the
+ * next post has scrolled to center), which otherwise let a photo's music keep playing behind an
+ * unrelated video below it instead of handing off. Whoever calls playExclusive last wins; anyone
+ * else currently playing gets paused immediately.
+ */
+let activeBackgroundAudio: HTMLAudioElement | null = null
+function playExclusive(audio: HTMLAudioElement) {
+  if (activeBackgroundAudio && activeBackgroundAudio !== audio) {
+    activeBackgroundAudio.pause()
+  }
+  activeBackgroundAudio = audio
+  audio.play().catch(() => {})
+}
+function pauseExclusive(audio: HTMLAudioElement) {
+  audio.pause()
+  if (activeBackgroundAudio === audio) {
+    activeBackgroundAudio = null
+  }
+}
+
 /** A single photo or video inside a mixed multi-item post. */
 type GroupMember = { kind: 'photo'; photo: Photo } | { kind: 'video'; video: Video }
 
@@ -204,8 +227,12 @@ function BackgroundMusic({ url, suppressed = false }: { url: string; suppressed?
   useEffect(() => {
     const el = wrapRef.current
     if (!el) return
+    // a tight band, not the generous one VideoTile uses for its own hover/touch autoplay — a
+    // wide band lets a TALL card (e.g. a big single photo) keep reporting "in view" well after
+    // the visitor has scrolled on to the next post, which was letting its music keep playing
+    // behind an unrelated video post below it instead of handing off promptly.
     const observer = new IntersectionObserver(([entry]) => setInView(entry.isIntersecting), {
-      rootMargin: '-35% 0px -35% 0px',
+      rootMargin: '-48% 0px -48% 0px',
       threshold: 0,
     })
     observer.observe(el)
@@ -216,16 +243,16 @@ function BackgroundMusic({ url, suppressed = false }: { url: string; suppressed?
     const audio = audioRef.current
     if (!audio) return
     if (inView && !suppressed) {
-      audio.play().catch(() => {})
+      playExclusive(audio)
     } else {
-      audio.pause()
+      pauseExclusive(audio)
     }
   }, [inView, suppressed])
 
   useEffect(() => {
     const retry = () => {
       const audio = audioRef.current
-      if (audio && inView && !suppressed) audio.play().catch(() => {})
+      if (audio && inView && !suppressed) playExclusive(audio)
     }
     audioUnlockRetries.add(retry)
     return () => {
@@ -245,7 +272,7 @@ function BackgroundMusic({ url, suppressed = false }: { url: string; suppressed?
         onClick={(e) => {
           e.stopPropagation()
           setMuted((m) => !m)
-          audioRef.current?.play().catch(() => {})
+          if (audioRef.current) playExclusive(audioRef.current)
         }}
         className="pointer-events-auto absolute bottom-3 left-3 z-10 grid size-11 place-items-center rounded-full bg-black/55 text-ink backdrop-blur transition hover:bg-black/75"
         aria-label={muted ? 'Unmute music' : 'Mute music'}
@@ -412,7 +439,7 @@ function MediaGroupCarousel({
     const el = containerRef.current
     if (!el) return
     const observer = new IntersectionObserver(([entry]) => setInView(entry.isIntersecting), {
-      rootMargin: '-35% 0px -35% 0px',
+      rootMargin: '-48% 0px -48% 0px',
       threshold: 0,
     })
     observer.observe(el)
@@ -635,6 +662,83 @@ export function GalleryPage() {
     } catch {
       alert('could not remove item')
     }
+  }
+
+  // Pinch/double-click/wheel zoom on a viewed photo, with drag-to-pan while zoomed in. Resets on
+  // navigation. While zoomed, the figure's own swipe-to-navigate drag is disabled (see the `drag`
+  // prop below) so panning the image doesn't fight with swiping to the next item.
+  const [zoomScale, setZoomScale] = useState(1)
+  const [pan, setPan] = useState({ x: 0, y: 0 })
+  const panStartRef = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null)
+  const lastTapRef = useRef(0)
+  const pinchRef = useRef<{ dist: number; scale: number } | null>(null)
+
+  useEffect(() => {
+    setZoomScale(1)
+    setPan({ x: 0, y: 0 })
+  }, [lightbox])
+
+  function toggleZoom() {
+    setZoomScale((s) => (s > 1 ? 1 : 2.5))
+    setPan({ x: 0, y: 0 })
+  }
+
+  function handleWheelZoom(e: React.WheelEvent) {
+    e.preventDefault()
+    e.stopPropagation()
+    setZoomScale((s) => {
+      const next = Math.min(4, Math.max(1, s - e.deltaY * 0.0015))
+      if (next === 1) setPan({ x: 0, y: 0 })
+      return next
+    })
+  }
+
+  function handleImagePointerDown(e: React.PointerEvent<HTMLImageElement>) {
+    if (zoomScale <= 1) return
+    e.stopPropagation()
+    e.currentTarget.setPointerCapture(e.pointerId)
+    panStartRef.current = { x: e.clientX, y: e.clientY, panX: pan.x, panY: pan.y }
+  }
+
+  function handleImagePointerMove(e: React.PointerEvent<HTMLImageElement>) {
+    if (!panStartRef.current) return
+    e.stopPropagation()
+    const limit = 120 * (zoomScale - 1)
+    setPan({
+      x: Math.min(limit, Math.max(-limit, panStartRef.current.panX + (e.clientX - panStartRef.current.x))),
+      y: Math.min(limit, Math.max(-limit, panStartRef.current.panY + (e.clientY - panStartRef.current.y))),
+    })
+  }
+
+  function handleImagePointerUp() {
+    panStartRef.current = null
+  }
+
+  function touchDistance(a: React.Touch, b: React.Touch) {
+    return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY)
+  }
+
+  function handleImageTouchStart(e: React.TouchEvent) {
+    if (e.touches.length === 2) {
+      pinchRef.current = { dist: touchDistance(e.touches[0], e.touches[1]), scale: zoomScale }
+    } else if (e.touches.length === 1) {
+      const now = Date.now()
+      if (now - lastTapRef.current < 300) toggleZoom()
+      lastTapRef.current = now
+    }
+  }
+
+  function handleImageTouchMove(e: React.TouchEvent) {
+    if (e.touches.length !== 2 || !pinchRef.current) return
+    e.preventDefault()
+    const dist = touchDistance(e.touches[0], e.touches[1])
+    const next = Math.min(4, Math.max(1, pinchRef.current.scale * (dist / pinchRef.current.dist)))
+    setZoomScale(next)
+    if (next === 1) setPan({ x: 0, y: 0 })
+  }
+
+  function handleImageTouchEnd(e: React.TouchEvent) {
+    if (e.touches.length < 2) pinchRef.current = null
   }
 
   // TikTok-style background track: photos have no audio of their own, so a post's attached
@@ -1061,9 +1165,9 @@ export function GalleryPage() {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.3 }}
-              className="max-h-[86svh] max-w-full cursor-grab active:cursor-grabbing"
+              className={clsx('max-h-[86svh] max-w-full', zoomScale === 1 && 'cursor-grab active:cursor-grabbing')}
               onClick={(e) => e.stopPropagation()}
-              drag="x"
+              drag={current.kind === 'photo' && zoomScale > 1 ? false : 'x'}
               dragConstraints={{ left: 0, right: 0 }}
               dragElastic={0.6}
               onDragEnd={(_, info) => {
@@ -1080,7 +1184,20 @@ export function GalleryPage() {
                   src={current.photo.url}
                   alt={current.photo.title}
                   draggable={false}
-                  className="mx-auto block max-h-[74svh] max-w-full rounded-xl object-contain shadow-2xl"
+                  onDoubleClick={toggleZoom}
+                  onWheel={handleWheelZoom}
+                  onPointerDown={handleImagePointerDown}
+                  onPointerMove={handleImagePointerMove}
+                  onPointerUp={handleImagePointerUp}
+                  onPointerCancel={handleImagePointerUp}
+                  onTouchStart={handleImageTouchStart}
+                  onTouchMove={handleImageTouchMove}
+                  onTouchEnd={handleImageTouchEnd}
+                  style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoomScale})` }}
+                  className={clsx(
+                    'mx-auto block max-h-[74svh] max-w-full touch-none select-none rounded-xl object-contain shadow-2xl transition-transform duration-150',
+                    zoomScale > 1 ? 'cursor-grab active:cursor-grabbing' : 'cursor-zoom-in',
+                  )}
                 />
               ) : (
                 <video
@@ -1169,6 +1286,7 @@ export function GalleryPage() {
 
             <div className="absolute bottom-5 left-1/2 -translate-x-1/2 font-mono text-[11px] text-faint">
               {current.groupTotal ? `${current.groupIndex} / ${current.groupTotal} · ` : ''}use ← → keys
+              {current.kind === 'photo' ? ' · double-click/pinch to zoom' : ''}
             </div>
           </motion.div>
         )}
