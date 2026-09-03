@@ -59,6 +59,7 @@ export function JournalPage() {
   const [showAiPanel, setShowAiPanel] = useState(false)
   const [aiNotes, setAiNotes] = useState('')
   const [aiReport, setAiReport] = useState<string | null>(null)
+  const [aiTitle, setAiTitle] = useState<string | null>(null)
   const [aiGenerating, setAiGenerating] = useState(false)
   const [aiError, setAiError] = useState<string | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -68,6 +69,7 @@ export function JournalPage() {
     setShowAiPanel(false)
     setAiNotes('')
     setAiReport(null)
+    setAiTitle(null)
     setAiError(null)
   }
 
@@ -76,8 +78,9 @@ export function JournalPage() {
     setAiGenerating(true)
     setAiError(null)
     try {
-      const report = await journal.generateAiReport(aiNotes, draft.entryDate)
+      const { title, report } = await journal.generateAiReport(aiNotes, draft.entryDate)
       setAiReport(report)
+      setAiTitle(title)
     } catch {
       setAiError('could not generate report — check the OpenAI key on the server')
     } finally {
@@ -89,6 +92,7 @@ export function JournalPage() {
     if (!aiReport) return
     setDraft((d) => ({
       ...d,
+      title: aiTitle?.trim() ? aiTitle.trim() : d.title,
       content: mode === 'replace' || !d.content.trim() ? aiReport : `${d.content}\n\n${aiReport}`,
     }))
     resetAiPanel()
@@ -427,6 +431,14 @@ export function JournalPage() {
               </>
             ) : (
               <>
+                {aiTitle !== null && (
+                  <input
+                    value={aiTitle}
+                    onChange={(e) => setAiTitle(e.target.value)}
+                    placeholder="AI-generated title"
+                    className="mb-2 w-full rounded-xl bg-black/20 p-3 font-mono text-sm font-semibold outline-none focus:ring-1 focus:ring-violet/50"
+                  />
+                )}
                 <textarea
                   value={aiReport}
                   onChange={(e) => setAiReport(e.target.value)}

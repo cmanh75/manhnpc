@@ -285,9 +285,9 @@ export const journal = {
     const { data } = await client.post('/journal/images', form, { headers: { 'Content-Type': 'multipart/form-data' } })
     return data.url as string
   },
-  async generateAiReport(notes: string, entryDate: string): Promise<string> {
+  async generateAiReport(notes: string, entryDate: string): Promise<{ title: string | null; report: string }> {
     const { data } = await client.post('/journal/ai-report', { notes, entryDate }, { timeout: 60_000 })
-    return data.report as string
+    return { title: (data.title as string | null) ?? null, report: data.report as string }
   },
 }
 

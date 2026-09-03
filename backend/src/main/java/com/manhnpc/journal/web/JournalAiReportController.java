@@ -19,8 +19,14 @@ public class JournalAiReportController {
 
     private static final String SYSTEM_PROMPT = """
             You are a study-journal assistant. The user will give you raw notes about what they \
-            learned/did today (possibly messy, bullet-point, unedited). Turn those notes into a \
-            detailed daily report in English, formatted as Markdown, with exactly these sections:
+            learned/did today (possibly messy, bullet-point, unedited). Respond with exactly two parts, \
+            in this order:
+
+            1. A single line starting with "Title: " followed by a short, specific, descriptive title \
+            (English, no surrounding quotes, no trailing period, ideally under 60 characters) that \
+            captures the main topic(s) of the day's notes.
+            2. A blank line, then turn the notes into a detailed daily report in English, formatted as \
+            Markdown, with exactly these sections:
 
             ## Summary
             2-4 sentences giving the high-level picture of the day.
@@ -54,7 +60,7 @@ public class JournalAiReportController {
 
     public record AiReportRequest(String notes, LocalDate entryDate) {}
 
-    public record AiReportResponse(String report) {}
+    public record AiReportResponse(String title, String report) {}
 
     @PostMapping
     public AiReportResponse generate(@RequestBody AiReportRequest request) {
@@ -63,7 +69,19 @@ public class JournalAiReportController {
         }
         LocalDate date = request.entryDate() != null ? request.entryDate() : LocalDate.now();
         String userPrompt = "Date: " + date + "\n\nMy notes:\n" + request.notes();
-        String report = openAiClient.chat(SYSTEM_PROMPT, userPrompt, 4000);
-        return new AiReportResponse(report);
+        String raw = openAiClient.chat(SYSTEM_PROMPT, userPrompt, 4000);
+        return splitTitleAndReport(raw);
+    }
+
+    /** Pulls the leading "Title: ..." line off the model's response, if present. */
+    private static AiReportResponse splitTitleAndReport(String raw) {
+        int newline = raw.indexOf('\n');
+        String firstLine = newline >= 0 ? raw.substring(0, newline) : raw;
+        if (firstLine.regionMatches(true, 0, "Title:", 0, 6)) {
+            String title = firstLine.substring(6).trim();
+            String report = newline >= 0 ? raw.substring(newline + 1).stripLeading() : "";
+            return new AiReportResponse(title, report);
+        }
+        return new AiReportResponse(null, raw);
     }
 }
