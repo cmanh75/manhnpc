@@ -480,6 +480,10 @@ function MediaGroupCarousel({
 
 export function GalleryPage() {
   const owner = useAppStore((s) => s.owner)
+  // native HTML5 drag (draggable=true) has no touch support and, worse, makes touch browsers
+  // delay tap recognition while they wait to see if it's a long-press-to-drag — reorder tiles
+  // only get `draggable` on devices that can actually use it; touch falls back to the arrows.
+  const hoverCapable = useHoverCapable()
   const [photos, setPhotos] = useState<Photo[]>([])
   const [videos, setVideos] = useState<Video[]>([])
   const [category, setCategory] = useState<(typeof categories)[number]>('all')
@@ -1172,7 +1176,7 @@ export function GalleryPage() {
                   {uploadForm.files.map((file, i) => (
                     <div
                       key={i}
-                      draggable={uploadForm.files.length > 1}
+                      draggable={hoverCapable && uploadForm.files.length > 1}
                       onDragStart={() => setDraggedFileIndex(i)}
                       onDragOver={(e) => e.preventDefault()}
                       onDrop={() => {
@@ -1471,16 +1475,18 @@ export function GalleryPage() {
                 </button>
               </div>
 
-              <p className="mb-3 font-mono text-[10px] text-faint">drag to reorder, or use the arrows</p>
+              <p className="mb-3 font-mono text-[10px] text-faint">
+                {hoverCapable ? 'drag to reorder, or use the arrows' : 'use the arrows to reorder'}
+              </p>
 
-              <div className="mb-4 flex flex-wrap gap-2">
+              <div className="mb-4 flex flex-wrap gap-3">
                 {reorderMembers.map((member, i) => {
                   const thumb = member.kind === 'photo' ? member.photo.thumbnailUrl : member.video.thumbnailUrl
                   const key = member.kind === 'photo' ? `photo-${member.photo.id}` : `video-${member.video.id}`
                   return (
                     <div
                       key={key}
-                      draggable
+                      draggable={hoverCapable}
                       onDragStart={() => setDraggedMemberIndex(i)}
                       onDragOver={(e) => e.preventDefault()}
                       onDrop={() => {
@@ -1489,7 +1495,10 @@ export function GalleryPage() {
                         setDraggedMemberIndex(null)
                       }}
                       onDragEnd={() => setDraggedMemberIndex(null)}
-                      className="group/tile relative size-20 shrink-0 cursor-grab overflow-hidden rounded-lg bg-black/40 ring-1 ring-white/10 active:cursor-grabbing"
+                      className={clsx(
+                        'relative size-24 shrink-0 overflow-hidden rounded-lg bg-black/40 ring-1 ring-white/10',
+                        hoverCapable && 'cursor-grab active:cursor-grabbing',
+                      )}
                     >
                       <img src={thumb} alt="" draggable={false} className="size-full object-cover" />
                       {member.kind === 'video' && (
@@ -1497,27 +1506,27 @@ export function GalleryPage() {
                           <Play size={14} className="text-ink" fill="currentColor" />
                         </div>
                       )}
-                      <span className="absolute left-1 top-1 grid size-4 place-items-center rounded-full bg-black/70 font-mono text-[9px] text-ink">
+                      <span className="absolute left-1 top-1 grid size-5 place-items-center rounded-full bg-black/70 font-mono text-[10px] text-ink">
                         {i + 1}
                       </span>
-                      <div className="absolute inset-x-0 bottom-0 flex justify-between bg-black/60 px-0.5 py-0.5 opacity-100 transition md:opacity-0 md:group-hover/tile:opacity-100">
+                      <div className="absolute inset-x-0 bottom-0 flex justify-between gap-1 bg-black/70 p-1">
                         <button
                           type="button"
                           disabled={i === 0}
                           onClick={() => setReorderMembers((prev) => moveItem(prev, i, i - 1))}
-                          className="grid size-5 place-items-center rounded text-ink transition hover:bg-white/20 disabled:opacity-30"
+                          className="grid size-8 flex-1 place-items-center rounded text-ink transition hover:bg-white/20 disabled:opacity-30"
                           aria-label="Move earlier"
                         >
-                          <ChevronLeft size={12} />
+                          <ChevronLeft size={16} />
                         </button>
                         <button
                           type="button"
                           disabled={i === reorderMembers.length - 1}
                           onClick={() => setReorderMembers((prev) => moveItem(prev, i, i + 1))}
-                          className="grid size-5 place-items-center rounded text-ink transition hover:bg-white/20 disabled:opacity-30"
+                          className="grid size-8 flex-1 place-items-center rounded text-ink transition hover:bg-white/20 disabled:opacity-30"
                           aria-label="Move later"
                         >
-                          <ChevronRight size={12} />
+                          <ChevronRight size={16} />
                         </button>
                       </div>
                     </div>
