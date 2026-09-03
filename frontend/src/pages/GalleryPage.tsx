@@ -287,9 +287,14 @@ function BackgroundMusic({ url, suppressed = false }: { url: string; suppressed?
  * Pinch/double-click/wheel zoom for a viewed photo, with drag-to-pan while zoomed. All gesture
  * state (scale, pan, and whether a gesture is actively in progress) lives here, not in the parent
  * viewer — a pinch fires touchmove dozens of times a second, and re-rendering the entire gallery
- * page on every one of those was the cause of the stutter on mobile. `onZoomChange` only fires on
- * an actual zoom-in/zoom-out transition, so lifting that little bit further up (to disable the
- * figure's own swipe-to-navigate drag while zoomed) stays cheap.
+ * page on every one of those was the cause of the stutter on mobile.
+ *
+ * `onZoomChange` fires on `scale > 1 || gesturing`, not just `scale > 1` — a two-finger pinch's
+ * fingers are already moving apart/together for a few frames before that motion has translated
+ * into a scale ratio, and the parent figure's own swipe-to-navigate drag was reading those same
+ * finger movements as a horizontal swipe attempt during that window (before scale had actually
+ * changed). `gesturing` flips true the instant a second touch lands, well before any scale math,
+ * so the parent disables its drag in time.
  */
 function ZoomableImage({ src, alt, onZoomChange }: { src: string; alt: string; onZoomChange: (zoomed: boolean) => void }) {
   const [scale, setScale] = useState(1)
@@ -300,8 +305,8 @@ function ZoomableImage({ src, alt, onZoomChange }: { src: string; alt: string; o
   const pinchRef = useRef<{ dist: number; scale: number } | null>(null)
 
   useEffect(() => {
-    onZoomChange(scale > 1)
-  }, [scale, onZoomChange])
+    onZoomChange(scale > 1 || gesturing)
+  }, [scale, gesturing, onZoomChange])
 
   function toggleZoom() {
     setGesturing(false)

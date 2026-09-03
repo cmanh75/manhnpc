@@ -66,11 +66,17 @@
 
 html {
   scroll-behavior: smooth;
+  /* without this, an aggressive pull/pinch gesture at the top of the page on mobile Chrome/Edge
+     triggers the browser's native pull-to-refresh and reloads the whole app — this keeps normal
+     scrolling and rubber-banding inside child elements working, it only blocks that one gesture
+     from escaping to the browser chrome. */
+  overscroll-behavior-y: contain;
 }
 
 body {
   @apply bg-void text-ink font-body antialiased;
   overflow-x: hidden;
+  overscroll-behavior-y: contain;
 }
 
 ::selection {
