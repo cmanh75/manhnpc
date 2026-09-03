@@ -202,6 +202,10 @@ export const api = {
     await client.delete(`/media/videos/${id}`)
   },
 
+  async reorderMediaGroup(groupId: string, order: { kind: 'photo' | 'video'; id: number }[]): Promise<void> {
+    await client.put(`/media/groups/${groupId}/order`, order)
+  },
+
   /** Fire-and-forget view beacons — failures are silently ignored, same as audit.recordVisit. */
   recordPhotoView(id: number) {
     client.post(`/media/photos/${id}/view`).catch(() => {})

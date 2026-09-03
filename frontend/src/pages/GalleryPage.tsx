@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import axios from 'axios'
 import { useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
-import { X, ChevronLeft, ChevronRight, MapPin, Calendar, Search, Plus, Trash2, Upload, Play, Clock, Pencil, Eye, Music, Volume2, VolumeX } from 'lucide-react'
+import { X, ChevronLeft, ChevronRight, MapPin, Calendar, Search, Plus, Trash2, Upload, Play, Clock, Pencil, Eye, Music, Volume2, VolumeX, ListOrdered } from 'lucide-react'
 import { PageShell, SectionHeading, Reveal } from '../components/ui'
 import { api } from '../lib/api'
 import type { Photo, Video } from '../lib/types'
@@ -127,6 +127,14 @@ function feedItemLocation(item: FeedItem): string {
     return firstPhoto?.photo.location ?? ''
   }
   return ''
+}
+
+/** Moves the item at `from` to index `to`, shifting the rest — used for drag/arrow reordering. */
+function moveItem<T>(arr: T[], from: number, to: number): T[] {
+  const next = [...arr]
+  const [item] = next.splice(from, 1)
+  next.splice(to, 0, item)
+  return next
 }
 
 function emptyUploadForm() {
@@ -378,12 +386,19 @@ export function GalleryPage() {
   const [uploadProgress, setUploadProgress] = useState(0)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [draggedFileIndex, setDraggedFileIndex] = useState<number | null>(null)
 
   const [showEdit, setShowEdit] = useState(false)
   const [editForm, setEditForm] = useState({ title: '', description: '', category: 'life' as string, location: '', date: '', file: null as File | null })
   const [editing, setEditing] = useState(false)
   const [editProgress, setEditProgress] = useState(0)
   const [editError, setEditError] = useState<string | null>(null)
+
+  const [showReorder, setShowReorder] = useState(false)
+  const [reorderMembers, setReorderMembers] = useState<GroupMember[]>([])
+  const [draggedMemberIndex, setDraggedMemberIndex] = useState<number | null>(null)
+  const [reordering, setReordering] = useState(false)
+  const [reorderError, setReorderError] = useState<string | null>(null)
 
   useEffect(() => {
     api.getPhotos().then(setPhotos).catch(() => {})
@@ -430,7 +445,7 @@ export function GalleryPage() {
   // in-flow footer through the fullscreen overlay. `overflow: hidden` on body alone doesn't stop
   // touch scroll on iOS/Android, so pin body to the current scroll position with `position: fixed`.
   useEffect(() => {
-    if (lightbox === null && !showUpload && !showEdit) return
+    if (lightbox === null && !showUpload && !showEdit && !showReorder) return
     const scrollY = window.scrollY
     const body = document.body.style
     const previous = { position: body.position, top: body.top, left: body.left, right: body.right, width: body.width }
@@ -447,7 +462,7 @@ export function GalleryPage() {
       body.width = previous.width
       window.scrollTo(0, scrollY)
     }
-  }, [lightbox, showUpload, showEdit])
+  }, [lightbox, showUpload, showEdit, showReorder])
 
   // keyboard navigation for the fullscreen viewer
   useEffect(() => {
@@ -631,6 +646,46 @@ export function GalleryPage() {
       setEditError('update failed — check the backend/R2 config')
     } finally {
       setEditing(false)
+    }
+  }
+
+  const currentGroupId = current?.kind === 'photo' ? current.photo.groupId : current?.kind === 'video' ? current.video.groupId : null
+
+  function openReorder() {
+    if (!currentGroupId) return
+    const members: GroupMember[] = [
+      ...photos.filter((p) => p.groupId === currentGroupId).map((photo): GroupMember => ({ kind: 'photo', photo })),
+      ...videos.filter((v) => v.groupId === currentGroupId).map((video): GroupMember => ({ kind: 'video', video })),
+    ].sort((a, b) => (a.kind === 'photo' ? a.photo.position ?? 0 : a.video.position ?? 0) - (b.kind === 'photo' ? b.photo.position ?? 0 : b.video.position ?? 0))
+    setReorderMembers(members)
+    setReorderError(null)
+    setShowReorder(true)
+  }
+
+  async function submitReorder() {
+    if (!currentGroupId) return
+    setReordering(true)
+    setReorderError(null)
+    try {
+      const order = reorderMembers.map((m) => ({ kind: m.kind, id: m.kind === 'photo' ? m.photo.id : m.video.id }))
+      await api.reorderMediaGroup(currentGroupId, order)
+      setPhotos((prev) =>
+        prev.map((p) => {
+          const index = reorderMembers.findIndex((m) => m.kind === 'photo' && m.photo.id === p.id)
+          return index === -1 ? p : { ...p, position: index }
+        }),
+      )
+      setVideos((prev) =>
+        prev.map((v) => {
+          const index = reorderMembers.findIndex((m) => m.kind === 'video' && m.video.id === v.id)
+          return index === -1 ? v : { ...v, position: index }
+        }),
+      )
+      setShowReorder(false)
+    } catch {
+      setReorderError('could not save order')
+    } finally {
+      setReordering(false)
     }
   }
 
@@ -880,6 +935,17 @@ export function GalleryPage() {
                       <Pencil size={11} /> edit
                     </button>
                   )}
+                  {owner && currentGroupId && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        openReorder()
+                      }}
+                      className="flex items-center gap-1.5 text-violet transition hover:text-violet/80"
+                    >
+                      <ListOrdered size={11} /> reorder
+                    </button>
+                  )}
                   {owner && (
                     <button
                       onClick={(e) => {
@@ -943,7 +1009,27 @@ export function GalleryPage() {
               {uploadForm.files.length > 0 ? (
                 <div className="mb-1.5 flex flex-wrap gap-2 rounded-xl bg-white/5 p-2 ring-1 ring-white/10">
                   {uploadForm.files.map((file, i) => (
-                    <div key={i} className="group/tile relative size-16 shrink-0 overflow-hidden rounded-lg bg-black/40">
+                    <div
+                      key={i}
+                      draggable={uploadForm.files.length > 1}
+                      onDragStart={() => setDraggedFileIndex(i)}
+                      onDragOver={(e) => e.preventDefault()}
+                      onDrop={() => {
+                        if (draggedFileIndex === null || draggedFileIndex === i) return
+                        setUploadForm((f) => ({ ...f, files: moveItem(f.files, draggedFileIndex, i) }))
+                        setDraggedFileIndex(null)
+                      }}
+                      onDragEnd={() => setDraggedFileIndex(null)}
+                      className={clsx(
+                        'group/tile relative size-16 shrink-0 overflow-hidden rounded-lg bg-black/40',
+                        uploadForm.files.length > 1 && 'cursor-grab active:cursor-grabbing',
+                      )}
+                    >
+                      {uploadForm.files.length > 1 && (
+                        <span className="absolute left-0.5 top-0.5 z-10 grid size-4 place-items-center rounded-full bg-black/70 font-mono text-[9px] text-ink">
+                          {i + 1}
+                        </span>
+                      )}
                       {file.type.startsWith('video/') ? (
                         <>
                           <video src={previewUrls[i]} muted preload="metadata" className="size-full object-cover" />
@@ -992,7 +1078,7 @@ export function GalleryPage() {
                 </label>
               )}
               <p className="mb-3 min-h-[1em] font-mono text-[10px] text-faint">
-                {uploadForm.files.length > 1 && `${uploadForm.files.length} files · one title/caption applies to all`}
+                {uploadForm.files.length > 1 && `${uploadForm.files.length} files · drag to reorder · one title/caption applies to all`}
               </p>
 
               {uploadForm.music ? (
@@ -1181,6 +1267,100 @@ export function GalleryPage() {
                   <Pencil size={14} />
                   {editing ? 'saving…' : 'save changes'}
                 </span>
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ===== owner reorder-post modal ===== */}
+      <AnimatePresence>
+        {owner && showReorder && (
+          <motion.div
+            className="fixed inset-0 z-[90] flex items-center justify-center bg-black/90 p-4 backdrop-blur-md"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => !reordering && setShowReorder(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 16 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+              className="glass max-h-[85svh] w-full max-w-md overflow-y-auto rounded-2xl p-6"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="mb-5 flex items-center justify-between">
+                <h3 className="font-display text-lg font-semibold">Reorder post</h3>
+                <button onClick={() => setShowReorder(false)} className="rounded-full p-1.5 text-muted transition hover:bg-white/10 hover:text-ink">
+                  <X size={16} />
+                </button>
+              </div>
+
+              <p className="mb-3 font-mono text-[10px] text-faint">drag to reorder, or use the arrows</p>
+
+              <div className="mb-4 flex flex-wrap gap-2">
+                {reorderMembers.map((member, i) => {
+                  const thumb = member.kind === 'photo' ? member.photo.thumbnailUrl : member.video.thumbnailUrl
+                  const key = member.kind === 'photo' ? `photo-${member.photo.id}` : `video-${member.video.id}`
+                  return (
+                    <div
+                      key={key}
+                      draggable
+                      onDragStart={() => setDraggedMemberIndex(i)}
+                      onDragOver={(e) => e.preventDefault()}
+                      onDrop={() => {
+                        if (draggedMemberIndex === null || draggedMemberIndex === i) return
+                        setReorderMembers((prev) => moveItem(prev, draggedMemberIndex, i))
+                        setDraggedMemberIndex(null)
+                      }}
+                      onDragEnd={() => setDraggedMemberIndex(null)}
+                      className="group/tile relative size-20 shrink-0 cursor-grab overflow-hidden rounded-lg bg-black/40 ring-1 ring-white/10 active:cursor-grabbing"
+                    >
+                      <img src={thumb} alt="" draggable={false} className="size-full object-cover" />
+                      {member.kind === 'video' && (
+                        <div className="absolute inset-0 grid place-items-center bg-black/30">
+                          <Play size={14} className="text-ink" fill="currentColor" />
+                        </div>
+                      )}
+                      <span className="absolute left-1 top-1 grid size-4 place-items-center rounded-full bg-black/70 font-mono text-[9px] text-ink">
+                        {i + 1}
+                      </span>
+                      <div className="absolute inset-x-0 bottom-0 flex justify-between bg-black/60 px-0.5 py-0.5 opacity-100 transition md:opacity-0 md:group-hover/tile:opacity-100">
+                        <button
+                          type="button"
+                          disabled={i === 0}
+                          onClick={() => setReorderMembers((prev) => moveItem(prev, i, i - 1))}
+                          className="grid size-5 place-items-center rounded text-ink transition hover:bg-white/20 disabled:opacity-30"
+                          aria-label="Move earlier"
+                        >
+                          <ChevronLeft size={12} />
+                        </button>
+                        <button
+                          type="button"
+                          disabled={i === reorderMembers.length - 1}
+                          onClick={() => setReorderMembers((prev) => moveItem(prev, i, i + 1))}
+                          className="grid size-5 place-items-center rounded text-ink transition hover:bg-white/20 disabled:opacity-30"
+                          aria-label="Move later"
+                        >
+                          <ChevronRight size={12} />
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+
+              {reorderError && <p className="mb-3 font-mono text-xs text-pink">{reorderError}</p>}
+
+              <button
+                onClick={submitReorder}
+                disabled={reordering}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan to-violet px-5 py-2.5 font-mono text-sm font-semibold text-void transition enabled:hover:shadow-[0_0_24px_-6px_#22d3ee] disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <ListOrdered size={14} />
+                {reordering ? 'saving…' : 'save order'}
               </button>
             </motion.div>
           </motion.div>

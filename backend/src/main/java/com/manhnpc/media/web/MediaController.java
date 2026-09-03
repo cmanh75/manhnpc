@@ -9,6 +9,7 @@ import com.manhnpc.common.storage.R2StorageService.UploadResult;
 import com.manhnpc.media.storage.VideoProcessor;
 import com.manhnpc.media.storage.VideoProcessor.ProcessedVideo;
 import com.manhnpc.common.security.OwnerRequests;
+import com.manhnpc.common.web.error.BadRequestException;
 import com.manhnpc.common.web.error.NotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.io.IOException;
@@ -25,6 +26,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -300,6 +302,35 @@ public class MediaController {
         videos.deleteById(id);
         storage.delete(video.getStorageKey());
         storage.delete(video.getThumbnailKey());
+        return ResponseEntity.noContent().build();
+    }
+
+    public record GroupMemberRef(String kind, Long id) {}
+
+    /** Reorders a multi-item post's carousel: `order` is the full member list (mixed photos/videos)
+     *  in the desired display order, each item's `position` set to its index in that list. */
+    @PutMapping("/groups/{groupId}/order")
+    public ResponseEntity<Void> reorderGroup(@PathVariable String groupId, @RequestBody List<GroupMemberRef> order) {
+        for (int i = 0; i < order.size(); i++) {
+            GroupMemberRef ref = order.get(i);
+            if ("video".equalsIgnoreCase(ref.kind())) {
+                Video video = videos.findById(ref.id())
+                        .orElseThrow(() -> new NotFoundException("Video not found: " + ref.id()));
+                if (!groupId.equals(video.getGroupId())) {
+                    throw new BadRequestException("Video " + ref.id() + " is not in group " + groupId);
+                }
+                video.setPosition(i);
+                videos.save(video);
+            } else {
+                Photo photo = photos.findById(ref.id())
+                        .orElseThrow(() -> new NotFoundException("Photo not found: " + ref.id()));
+                if (!groupId.equals(photo.getGroupId())) {
+                    throw new BadRequestException("Photo " + ref.id() + " is not in group " + groupId);
+                }
+                photo.setPosition(i);
+                photos.save(photo);
+            }
+        }
         return ResponseEntity.noContent().build();
     }
 }
