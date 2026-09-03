@@ -44,6 +44,12 @@ public class Post {
 
     private String coverImage;
 
+    /** Public R2 URL of the music track attached to this post, if any. */
+    private String musicUrl;
+
+    /** R2 object key for {@link #musicUrl} — used to delete the object when replaced/removed. Not exposed for write via the JSON create/update endpoints. */
+    private String musicStorageKey;
+
     /** Comma-separated list of tags, e.g. "java,spring,microservices". */
     @Column(length = 500)
     private String tags;

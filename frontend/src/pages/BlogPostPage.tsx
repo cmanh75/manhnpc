@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { motion, useScroll, useSpring } from 'framer-motion'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { ArrowLeft, Clock, Eye, Calendar, Trash2 } from 'lucide-react'
+import { ArrowLeft, Clock, Eye, Calendar, Trash2, Music } from 'lucide-react'
 import { PageShell } from '../components/ui'
 import { api } from '../lib/api'
 import type { Post } from '../lib/types'
@@ -16,6 +16,8 @@ export function BlogPostPage() {
   const owner = useAppStore((s) => s.owner)
   const [post, setPost] = useState<Post | null | undefined>(null)
   const [deleting, setDeleting] = useState(false)
+  const [uploadingMusic, setUploadingMusic] = useState(false)
+  const musicInputRef = useRef<HTMLInputElement>(null)
   const { scrollYProgress } = useScroll()
   const progress = useSpring(scrollYProgress, { stiffness: 120, damping: 26 })
 
@@ -34,6 +36,28 @@ export function BlogPostPage() {
     } catch {
       alert('could not delete')
       setDeleting(false)
+    }
+  }
+
+  async function uploadMusic(file: File) {
+    if (!post) return
+    setUploadingMusic(true)
+    try {
+      setPost(await api.uploadPostMusic(post.id, file))
+    } catch {
+      alert('could not upload music')
+    } finally {
+      setUploadingMusic(false)
+    }
+  }
+
+  async function removeMusic() {
+    if (!post) return
+    if (!confirm('Remove the attached music track?')) return
+    try {
+      setPost(await api.removePostMusic(post.id))
+    } catch {
+      alert('could not remove music')
     }
   }
 
@@ -104,6 +128,44 @@ export function BlogPostPage() {
               )}
             </div>
           </header>
+
+          {(post.musicUrl || owner) && (
+            <div className="glass mb-8 flex flex-wrap items-center gap-3 rounded-2xl p-4">
+              <Music size={16} className="shrink-0 text-violet" />
+              {post.musicUrl ? (
+                <audio controls src={post.musicUrl} className="h-9 min-w-0 flex-1" />
+              ) : (
+                <span className="flex-1 font-mono text-xs text-faint">no music attached</span>
+              )}
+              {owner && (
+                <div className="flex shrink-0 items-center gap-3 font-mono text-xs">
+                  <button
+                    onClick={() => musicInputRef.current?.click()}
+                    disabled={uploadingMusic}
+                    className="text-cyan transition hover:underline disabled:opacity-40"
+                  >
+                    {uploadingMusic ? 'uploading…' : post.musicUrl ? 'replace' : 'upload'}
+                  </button>
+                  {post.musicUrl && (
+                    <button onClick={removeMusic} className="text-pink transition hover:underline">
+                      remove
+                    </button>
+                  )}
+                  <input
+                    ref={musicInputRef}
+                    type="file"
+                    accept="audio/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      if (file) uploadMusic(file)
+                      e.target.value = ''
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="relative mb-12 overflow-hidden rounded-3xl">
             <img src={post.coverImage} alt="" loading="lazy" className="aspect-[1200/630] w-full object-cover" />

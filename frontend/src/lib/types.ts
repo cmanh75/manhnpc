@@ -5,6 +5,7 @@ export interface Post {
   excerpt: string
   content: string
   coverImage: string
+  musicUrl: string | null
   tags: string[]
   category: string
   readingTime: number

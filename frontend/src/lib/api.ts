@@ -105,6 +105,18 @@ export const api = {
     await client.delete(`/posts/${id}`)
   },
 
+  async uploadPostMusic(id: number, file: File): Promise<Post> {
+    const form = new FormData()
+    form.append('file', file)
+    const { data } = await client.post(`/posts/${id}/music`, form, { headers: { 'Content-Type': 'multipart/form-data' } })
+    return normalizePost(assertJsonObject(data, 'uploadPostMusic'))
+  },
+
+  async removePostMusic(id: number): Promise<Post> {
+    const { data } = await client.delete(`/posts/${id}/music`)
+    return normalizePost(assertJsonObject(data, 'removePostMusic'))
+  },
+
   async getPhotos(category?: string): Promise<Photo[]> {
     const data = await trackedGet('/media/photos', category && category !== 'all' ? { category } : {})
     return assertJsonArray<Photo>(data, 'getPhotos')

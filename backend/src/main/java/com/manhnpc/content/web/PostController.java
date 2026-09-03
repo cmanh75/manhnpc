@@ -3,8 +3,11 @@ package com.manhnpc.content.web;
 import com.manhnpc.content.model.Post;
 import com.manhnpc.content.repository.PostRepository;
 import com.manhnpc.common.security.OwnerRequests;
+import com.manhnpc.common.storage.R2StorageService;
+import com.manhnpc.common.storage.R2StorageService.UploadResult;
 import com.manhnpc.common.web.error.NotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
+import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
@@ -23,6 +26,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/posts")
@@ -35,9 +39,11 @@ public class PostController {
     }
 
     private final PostRepository posts;
+    private final R2StorageService storage;
 
-    public PostController(PostRepository posts) {
+    public PostController(PostRepository posts, R2StorageService storage) {
         this.posts = posts;
+        this.storage = storage;
     }
 
     @GetMapping
@@ -120,11 +126,31 @@ public class PostController {
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
-        if (!posts.existsById(id)) {
-            throw new NotFoundException("Post not found: " + id);
-        }
+        Post post = posts.findById(id).orElseThrow(() -> new NotFoundException("Post not found: " + id));
         posts.deleteById(id);
+        storage.delete(post.getMusicStorageKey());
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{id}/music")
+    public Post uploadMusic(@PathVariable Long id, @RequestParam("file") MultipartFile file) throws IOException {
+        Post post = posts.findById(id).orElseThrow(() -> new NotFoundException("Post not found: " + id));
+        String oldKey = post.getMusicStorageKey();
+        UploadResult result = storage.upload(file, "post-music");
+        post.setMusicUrl(result.url());
+        post.setMusicStorageKey(result.key());
+        Post saved = posts.save(post);
+        storage.delete(oldKey);
+        return saved;
+    }
+
+    @DeleteMapping("/{id}/music")
+    public Post removeMusic(@PathVariable Long id) {
+        Post post = posts.findById(id).orElseThrow(() -> new NotFoundException("Post not found: " + id));
+        storage.delete(post.getMusicStorageKey());
+        post.setMusicUrl(null);
+        post.setMusicStorageKey(null);
+        return posts.save(post);
     }
 
     private static List<String> tagsOf(Post post) {
