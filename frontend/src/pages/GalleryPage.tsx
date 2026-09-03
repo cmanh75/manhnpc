@@ -372,16 +372,18 @@ function MediaGroupCarousel({
   members,
   title,
   onOpen,
-  suppressMusic = false,
+  viewerOpen = false,
 }: {
   members: GroupMember[]
   title: string
   onOpen: (index: number) => void
-  suppressMusic?: boolean
+  viewerOpen?: boolean
 }) {
   const [active, setActive] = useState(0)
+  const containerRef = useRef<HTMLDivElement>(null)
   const trackRef = useRef<HTMLDivElement>(null)
   const drag = useDragToScroll(trackRef)
+  const [inView, setInView] = useState(false)
   const musicUrl = members.map((m) => (m.kind === 'photo' ? m.photo.musicUrl : m.video.musicUrl)).find(Boolean) ?? null
   const activeIsVideo = members[active]?.kind === 'video'
 
@@ -398,9 +400,30 @@ function MediaGroupCarousel({
     el.scrollTo({ left: index * el.clientWidth, behavior: 'smooth' })
   }
 
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const observer = new IntersectionObserver(([entry]) => setInView(entry.isIntersecting), {
+      rootMargin: '-35% 0px -35% 0px',
+      threshold: 0,
+    })
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
+
+  // Instagram/TikTok-style auto-advance: cycles slides on its own only while the card is just
+  // being scrolled past in the feed — the moment the visitor clicks in to actually look at the
+  // post (fullscreen viewer open), this stops and stays on whatever they clicked. Re-running on
+  // every `active` change (including from a manual swipe) restarts the 3s window for free.
+  useEffect(() => {
+    if (!inView || viewerOpen || members.length <= 1) return
+    const timer = setTimeout(() => goTo((active + 1) % members.length), 3000)
+    return () => clearTimeout(timer)
+  }, [inView, viewerOpen, active, members.length])
+
   return (
-    <div className="relative aspect-[4/5] w-full overflow-hidden bg-black">
-      {musicUrl && <BackgroundMusic url={musicUrl} suppressed={activeIsVideo || suppressMusic} />}
+    <div ref={containerRef} className="relative aspect-[4/5] w-full overflow-hidden bg-black">
+      {musicUrl && <BackgroundMusic url={musicUrl} suppressed={activeIsVideo || viewerOpen} />}
       <div
         ref={trackRef}
         onScroll={handleScroll}
@@ -480,10 +503,6 @@ function MediaGroupCarousel({
 
 export function GalleryPage() {
   const owner = useAppStore((s) => s.owner)
-  // native HTML5 drag (draggable=true) has no touch support and, worse, makes touch browsers
-  // delay tap recognition while they wait to see if it's a long-press-to-drag — reorder tiles
-  // only get `draggable` on devices that can actually use it; touch falls back to the arrows.
-  const hoverCapable = useHoverCapable()
   const [photos, setPhotos] = useState<Photo[]>([])
   const [videos, setVideos] = useState<Video[]>([])
   const [category, setCategory] = useState<(typeof categories)[number]>('all')
@@ -589,21 +608,6 @@ export function GalleryPage() {
 
   const current = lightbox !== null ? viewerItems[lightbox] : null
   const currentGroupId = current?.kind === 'photo' ? current.photo.groupId : current?.kind === 'video' ? current.video.groupId : null
-
-  // TikTok-style auto-advance: inside a multi-item post, a photo slide moves to the next one
-  // after 3s on its own, wrapping back to the post's first item after its last — videos are left
-  // to play through instead (they already loop via onEnded below). Re-running this on every
-  // `lightbox` change means a manual swipe/arrow/keypress restarts the 3s window for free.
-  useEffect(() => {
-    if (lightbox === null || current?.kind !== 'photo' || !current.groupTotal || current.groupTotal <= 1) return
-    const groupIndex = current.groupIndex ?? 1
-    const groupStart = lightbox - (groupIndex - 1)
-    const isLast = groupIndex === current.groupTotal
-    const timer = setTimeout(() => {
-      setLightbox(isLast ? groupStart : lightbox + 1)
-    }, 3000)
-    return () => clearTimeout(timer)
-  }, [lightbox, current])
 
   // TikTok-style background track: photos have no audio of their own, so a post's attached
   // music (if any) loops behind the viewer while a photo from that post is on screen. Videos
@@ -947,7 +951,7 @@ export function GalleryPage() {
                     members={item.members}
                     title={title}
                     onOpen={(sub) => setLightbox(startIndex[i] + sub)}
-                    suppressMusic={lightbox !== null}
+                    viewerOpen={lightbox !== null}
                   />
                 ) : (
                   <VideoTile video={item.video} title={title} onOpen={() => setLightbox(startIndex[i])} />
@@ -1176,18 +1180,28 @@ export function GalleryPage() {
                   {uploadForm.files.map((file, i) => (
                     <div
                       key={i}
-                      draggable={hoverCapable && uploadForm.files.length > 1}
-                      onDragStart={() => setDraggedFileIndex(i)}
-                      onDragOver={(e) => e.preventDefault()}
-                      onDrop={() => {
-                        if (draggedFileIndex === null || draggedFileIndex === i) return
-                        setUploadForm((f) => ({ ...f, files: moveItem(f.files, draggedFileIndex, i) }))
-                        setDraggedFileIndex(null)
+                      data-reorder-index={i}
+                      onPointerDown={(e) => {
+                        if (uploadForm.files.length <= 1 || (e.target as HTMLElement).closest('button')) return
+                        e.currentTarget.setPointerCapture(e.pointerId)
+                        setDraggedFileIndex(i)
                       }}
-                      onDragEnd={() => setDraggedFileIndex(null)}
+                      onPointerMove={(e) => {
+                        if (draggedFileIndex === null) return
+                        const target = document
+                          .elementFromPoint(e.clientX, e.clientY)
+                          ?.closest('[data-reorder-index]') as HTMLElement | null
+                        if (!target) return
+                        const overIndex = Number(target.dataset.reorderIndex)
+                        if (Number.isNaN(overIndex) || overIndex === draggedFileIndex) return
+                        setUploadForm((f) => ({ ...f, files: moveItem(f.files, draggedFileIndex, overIndex) }))
+                        setDraggedFileIndex(overIndex)
+                      }}
+                      onPointerUp={() => setDraggedFileIndex(null)}
+                      onPointerCancel={() => setDraggedFileIndex(null)}
                       className={clsx(
-                        'group/tile relative size-16 shrink-0 overflow-hidden rounded-lg bg-black/40',
-                        uploadForm.files.length > 1 && 'cursor-grab active:cursor-grabbing',
+                        'group/tile relative size-16 shrink-0 touch-none select-none overflow-hidden rounded-lg bg-black/40',
+                        uploadForm.files.length > 1 && (draggedFileIndex === i ? 'cursor-grabbing opacity-70' : 'cursor-grab'),
                       )}
                     >
                       {uploadForm.files.length > 1 && (
@@ -1475,9 +1489,7 @@ export function GalleryPage() {
                 </button>
               </div>
 
-              <p className="mb-3 font-mono text-[10px] text-faint">
-                {hoverCapable ? 'drag to reorder, or use the arrows' : 'use the arrows to reorder'}
-              </p>
+              <p className="mb-3 font-mono text-[10px] text-faint">drag to reorder, or use the arrows</p>
 
               <div className="mb-4 flex flex-wrap gap-3">
                 {reorderMembers.map((member, i) => {
@@ -1486,18 +1498,28 @@ export function GalleryPage() {
                   return (
                     <div
                       key={key}
-                      draggable={hoverCapable}
-                      onDragStart={() => setDraggedMemberIndex(i)}
-                      onDragOver={(e) => e.preventDefault()}
-                      onDrop={() => {
-                        if (draggedMemberIndex === null || draggedMemberIndex === i) return
-                        setReorderMembers((prev) => moveItem(prev, draggedMemberIndex, i))
-                        setDraggedMemberIndex(null)
+                      data-reorder-index={i}
+                      onPointerDown={(e) => {
+                        if ((e.target as HTMLElement).closest('button')) return
+                        e.currentTarget.setPointerCapture(e.pointerId)
+                        setDraggedMemberIndex(i)
                       }}
-                      onDragEnd={() => setDraggedMemberIndex(null)}
+                      onPointerMove={(e) => {
+                        if (draggedMemberIndex === null) return
+                        const target = document
+                          .elementFromPoint(e.clientX, e.clientY)
+                          ?.closest('[data-reorder-index]') as HTMLElement | null
+                        if (!target) return
+                        const overIndex = Number(target.dataset.reorderIndex)
+                        if (Number.isNaN(overIndex) || overIndex === draggedMemberIndex) return
+                        setReorderMembers((prev) => moveItem(prev, draggedMemberIndex, overIndex))
+                        setDraggedMemberIndex(overIndex)
+                      }}
+                      onPointerUp={() => setDraggedMemberIndex(null)}
+                      onPointerCancel={() => setDraggedMemberIndex(null)}
                       className={clsx(
-                        'relative size-24 shrink-0 overflow-hidden rounded-lg bg-black/40 ring-1 ring-white/10',
-                        hoverCapable && 'cursor-grab active:cursor-grabbing',
+                        'relative size-24 shrink-0 touch-none select-none overflow-hidden rounded-lg bg-black/40 ring-1 ring-white/10',
+                        draggedMemberIndex === i ? 'cursor-grabbing opacity-70' : 'cursor-grab',
                       )}
                     >
                       <img src={thumb} alt="" draggable={false} className="size-full object-cover" />
