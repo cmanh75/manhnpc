@@ -155,6 +155,62 @@ function useHoverCapable() {
 }
 
 /**
+ * Instagram-style feed music: loops a post's attached track for as long as its card is scrolled
+ * into the center of the viewport — no click needed. Starts muted since browsers block unmuted
+ * autoplay without a user gesture; a small mute/unmute toggle sits in the corner of the card.
+ * `suppressed` pauses it without unmounting (so the muted preference survives) — used when the
+ * card's active slide is a video with its own audio, or the fullscreen viewer has taken over.
+ */
+function BackgroundMusic({ url, suppressed = false }: { url: string; suppressed?: boolean }) {
+  const wrapRef = useRef<HTMLDivElement>(null)
+  const audioRef = useRef<HTMLAudioElement>(null)
+  const [inView, setInView] = useState(false)
+  const [muted, setMuted] = useState(true)
+
+  useEffect(() => {
+    const el = wrapRef.current
+    if (!el) return
+    const observer = new IntersectionObserver(([entry]) => setInView(entry.isIntersecting), {
+      rootMargin: '-35% 0px -35% 0px',
+      threshold: 0,
+    })
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
+
+  useEffect(() => {
+    const audio = audioRef.current
+    if (!audio) return
+    if (inView && !suppressed) {
+      audio.play().catch(() => {})
+    } else {
+      audio.pause()
+    }
+  }, [inView, suppressed])
+
+  useEffect(() => {
+    if (audioRef.current) audioRef.current.muted = muted
+  }, [muted])
+
+  return (
+    <div ref={wrapRef} className="pointer-events-none absolute inset-0">
+      <audio ref={audioRef} src={url} loop muted={muted} hidden />
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation()
+          setMuted((m) => !m)
+        }}
+        className="pointer-events-auto absolute bottom-3 left-3 z-10 grid size-8 place-items-center rounded-full bg-black/50 text-ink backdrop-blur transition hover:bg-black/70"
+        aria-label={muted ? 'Unmute music' : 'Mute music'}
+      >
+        {muted ? <VolumeX size={14} /> : <Volume2 size={14} />}
+      </button>
+    </div>
+  )
+}
+
+/**
  * Video feed card: shows the thumbnail by default. On hover-capable devices it autoplays muted
  * inline when the pointer enters; on touch devices (no hover) it autoplays when scrolled to the
  * center of the viewport instead, via IntersectionObserver.
@@ -274,10 +330,22 @@ function useDragToScroll(trackRef: RefObject<HTMLDivElement | null>) {
 /** Instagram-style swipeable carousel embedded in a feed card, with dot indicators.
  *  Members can be a mix of photos and videos — the box height is fixed (same for every slide,
  *  never resizes as you swipe) and each photo/video shrinks to fit inside it uncropped. */
-function MediaGroupCarousel({ members, title, onOpen }: { members: GroupMember[]; title: string; onOpen: (index: number) => void }) {
+function MediaGroupCarousel({
+  members,
+  title,
+  onOpen,
+  suppressMusic = false,
+}: {
+  members: GroupMember[]
+  title: string
+  onOpen: (index: number) => void
+  suppressMusic?: boolean
+}) {
   const [active, setActive] = useState(0)
   const trackRef = useRef<HTMLDivElement>(null)
   const drag = useDragToScroll(trackRef)
+  const musicUrl = members.map((m) => (m.kind === 'photo' ? m.photo.musicUrl : m.video.musicUrl)).find(Boolean) ?? null
+  const activeIsVideo = members[active]?.kind === 'video'
 
   function handleScroll() {
     const el = trackRef.current
@@ -294,6 +362,7 @@ function MediaGroupCarousel({ members, title, onOpen }: { members: GroupMember[]
 
   return (
     <div className="relative aspect-[4/5] w-full overflow-hidden bg-black">
+      {musicUrl && <BackgroundMusic url={musicUrl} suppressed={activeIsVideo || suppressMusic} />}
       <div
         ref={trackRef}
         onScroll={handleScroll}
@@ -807,16 +876,22 @@ export function GalleryPage() {
                 className="border-beam group overflow-hidden rounded-2xl bg-panel"
               >
                 {item.kind === 'photo' ? (
-                  <button onClick={() => setLightbox(startIndex[i])} className="block w-full" data-cursor="pointer">
+                  <button onClick={() => setLightbox(startIndex[i])} className="relative block w-full" data-cursor="pointer">
                     <img
                       src={item.photo.thumbnailUrl}
                       alt={title}
                       loading="lazy"
                       className="max-h-[560px] w-full object-cover transition duration-700 group-hover:scale-[1.02]"
                     />
+                    {item.photo.musicUrl && <BackgroundMusic url={item.photo.musicUrl} suppressed={lightbox !== null} />}
                   </button>
                 ) : item.kind === 'group' ? (
-                  <MediaGroupCarousel members={item.members} title={title} onOpen={(sub) => setLightbox(startIndex[i] + sub)} />
+                  <MediaGroupCarousel
+                    members={item.members}
+                    title={title}
+                    onOpen={(sub) => setLightbox(startIndex[i] + sub)}
+                    suppressMusic={lightbox !== null}
+                  />
                 ) : (
                   <VideoTile video={item.video} title={title} onOpen={() => setLightbox(startIndex[i])} />
                 )}
@@ -920,7 +995,7 @@ export function GalleryPage() {
                   src={current.photo.url}
                   alt={current.photo.title}
                   draggable={false}
-                  className="max-h-[74svh] max-w-full rounded-xl object-contain shadow-2xl"
+                  className="mx-auto block max-h-[74svh] max-w-full rounded-xl object-contain shadow-2xl"
                 />
               ) : (
                 <video
@@ -934,7 +1009,7 @@ export function GalleryPage() {
                     el.currentTime = 0
                     el.load()
                   }}
-                  className="max-h-[74svh] max-w-full rounded-xl bg-black object-contain shadow-2xl"
+                  className="mx-auto block max-h-[74svh] max-w-full rounded-xl bg-black object-contain shadow-2xl"
                 />
               )}
               <figcaption className="mt-4 flex flex-wrap items-center justify-between gap-3">
