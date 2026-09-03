@@ -9,4 +9,6 @@ public interface PhotoRepository extends JpaRepository<Photo, Long> {
     List<Photo> findByCategoryIgnoreCaseOrderByTakenAtDesc(String category);
 
     List<Photo> findAllByOrderByTakenAtDesc();
+
+    List<Photo> findByGroupId(String groupId);
 }

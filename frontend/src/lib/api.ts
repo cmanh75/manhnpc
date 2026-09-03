@@ -206,6 +206,19 @@ export const api = {
     await client.put(`/media/groups/${groupId}/order`, order)
   },
 
+  async updateMediaGroup(
+    groupId: string,
+    meta: { title: string; description: string; category: string; location: string },
+  ): Promise<{ photos: Photo[]; videos: Video[] }> {
+    const { data } = await client.put(`/media/groups/${groupId}`, meta)
+    const result = assertJsonObject<{ photos?: Photo[]; videos?: Video[] }>(data, 'updateMediaGroup')
+    return { photos: result.photos ?? [], videos: result.videos ?? [] }
+  },
+
+  async deleteMediaGroup(groupId: string): Promise<void> {
+    await client.delete(`/media/groups/${groupId}`)
+  },
+
   /** Fire-and-forget view beacons — failures are silently ignored, same as audit.recordVisit. */
   recordPhotoView(id: number) {
     client.post(`/media/photos/${id}/view`).catch(() => {})

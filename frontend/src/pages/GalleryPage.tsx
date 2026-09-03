@@ -477,6 +477,7 @@ export function GalleryPage() {
   }, [lightbox, viewerItems.length])
 
   const current = lightbox !== null ? viewerItems[lightbox] : null
+  const currentGroupId = current?.kind === 'photo' ? current.photo.groupId : current?.kind === 'video' ? current.video.groupId : null
 
   // TikTok-style background track: photos have no audio of their own, so a post's attached
   // music (if any) loops behind the viewer while a photo from that post is on screen. Videos
@@ -560,6 +561,22 @@ export function GalleryPage() {
 
   async function deleteCurrent() {
     if (!current) return
+    if (currentGroupId) {
+      const count = current.groupTotal ?? 1
+      if (!confirm(`Delete this post (${count} item${count > 1 ? 's' : ''})?`)) return
+      setDeleting(true)
+      try {
+        await api.deleteMediaGroup(currentGroupId)
+        setPhotos((prev) => prev.filter((p) => p.groupId !== currentGroupId))
+        setVideos((prev) => prev.filter((v) => v.groupId !== currentGroupId))
+        setLightbox(null)
+      } catch {
+        alert('could not delete')
+      } finally {
+        setDeleting(false)
+      }
+      return
+    }
     const label = current.kind === 'photo' ? current.photo.title : current.video.title
     if (!confirm(`Delete "${label}"?`)) return
     setDeleting(true)
@@ -581,7 +598,16 @@ export function GalleryPage() {
 
   function openEdit() {
     if (!current) return
-    if (current.kind === 'photo') {
+    if (currentGroupId) {
+      setEditForm({
+        title: current.kind === 'photo' ? current.photo.title : current.video.title,
+        description: (current.kind === 'photo' ? current.photo.description : current.video.description) ?? '',
+        category: current.kind === 'photo' ? current.photo.category : current.video.category,
+        location: current.kind === 'photo' ? current.photo.location ?? '' : '',
+        date: '',
+        file: null,
+      })
+    } else if (current.kind === 'photo') {
       setEditForm({
         title: current.photo.title,
         description: current.photo.description ?? '',
@@ -613,7 +639,16 @@ export function GalleryPage() {
     setEditProgress(0)
     setEditError(null)
     try {
-      if (current.kind === 'photo') {
+      if (currentGroupId) {
+        const result = await api.updateMediaGroup(currentGroupId, {
+          title: editForm.title.trim(),
+          description: editForm.description.trim(),
+          category: editForm.category,
+          location: editForm.location.trim(),
+        })
+        setPhotos((prev) => prev.map((p) => result.photos.find((u) => u.id === p.id) ?? p))
+        setVideos((prev) => prev.map((v) => result.videos.find((u) => u.id === v.id) ?? v))
+      } else if (current.kind === 'photo') {
         const updated = await api.updatePhoto(
           current.photo.id,
           {
@@ -648,8 +683,6 @@ export function GalleryPage() {
       setEditing(false)
     }
   }
-
-  const currentGroupId = current?.kind === 'photo' ? current.photo.groupId : current?.kind === 'video' ? current.video.groupId : null
 
   function openReorder() {
     if (!currentGroupId) return
@@ -932,7 +965,7 @@ export function GalleryPage() {
                       }}
                       className="flex items-center gap-1.5 text-cyan transition hover:text-cyan/80"
                     >
-                      <Pencil size={11} /> edit
+                      <Pencil size={11} /> {currentGroupId ? 'edit post' : 'edit'}
                     </button>
                   )}
                   {owner && currentGroupId && (
@@ -955,7 +988,7 @@ export function GalleryPage() {
                       disabled={deleting}
                       className="flex items-center gap-1.5 text-pink transition hover:text-pink/80 disabled:opacity-40"
                     >
-                      <Trash2 size={11} /> {deleting ? 'deleting…' : 'delete'}
+                      <Trash2 size={11} /> {deleting ? 'deleting…' : currentGroupId ? 'delete post' : 'delete'}
                     </button>
                   )}
                 </div>
@@ -1179,37 +1212,47 @@ export function GalleryPage() {
               onClick={(e) => e.stopPropagation()}
             >
               <div className="mb-5 flex items-center justify-between">
-                <h3 className="font-display text-lg font-semibold">{current.kind === 'photo' ? 'Edit photo' : 'Edit video'}</h3>
+                <h3 className="font-display text-lg font-semibold">
+                  {currentGroupId ? 'Edit post' : current.kind === 'photo' ? 'Edit photo' : 'Edit video'}
+                </h3>
                 <button onClick={() => setShowEdit(false)} className="rounded-full p-1.5 text-muted transition hover:bg-white/10 hover:text-ink">
                   <X size={16} />
                 </button>
               </div>
 
-              <label className="mb-3 block cursor-pointer overflow-hidden rounded-xl border border-dashed border-white/15 transition hover:border-cyan/40">
-                {current.kind === 'photo' ? (
-                  <img
-                    src={editPreviewUrl ?? current.photo.thumbnailUrl}
-                    alt=""
-                    className="max-h-48 w-full object-cover"
+              {currentGroupId && (
+                <p className="mb-3 font-mono text-[10px] text-faint">
+                  applies to all {current.groupTotal} items in this post
+                </p>
+              )}
+
+              {!currentGroupId && (
+                <label className="mb-3 block cursor-pointer overflow-hidden rounded-xl border border-dashed border-white/15 transition hover:border-cyan/40">
+                  {current.kind === 'photo' ? (
+                    <img
+                      src={editPreviewUrl ?? current.photo.thumbnailUrl}
+                      alt=""
+                      className="max-h-48 w-full object-cover"
+                    />
+                  ) : (
+                    <video
+                      src={editPreviewUrl ?? current.video.url}
+                      poster={editPreviewUrl ? undefined : current.video.thumbnailUrl}
+                      muted
+                      className="max-h-48 w-full object-cover"
+                    />
+                  )}
+                  <div className="flex items-center justify-center gap-2 bg-white/5 py-2 font-mono text-xs text-muted hover:text-cyan">
+                    <Upload size={13} /> {current.kind === 'photo' ? 'replace photo (optional)' : 'replace video (optional)'}
+                  </div>
+                  <input
+                    type="file"
+                    accept={current.kind === 'photo' ? 'image/*' : 'video/*'}
+                    className="hidden"
+                    onChange={(e) => setEditForm((f) => ({ ...f, file: e.target.files?.[0] ?? null }))}
                   />
-                ) : (
-                  <video
-                    src={editPreviewUrl ?? current.video.url}
-                    poster={editPreviewUrl ? undefined : current.video.thumbnailUrl}
-                    muted
-                    className="max-h-48 w-full object-cover"
-                  />
-                )}
-                <div className="flex items-center justify-center gap-2 bg-white/5 py-2 font-mono text-xs text-muted hover:text-cyan">
-                  <Upload size={13} /> {current.kind === 'photo' ? 'replace photo (optional)' : 'replace video (optional)'}
-                </div>
-                <input
-                  type="file"
-                  accept={current.kind === 'photo' ? 'image/*' : 'video/*'}
-                  className="hidden"
-                  onChange={(e) => setEditForm((f) => ({ ...f, file: e.target.files?.[0] ?? null }))}
-                />
-              </label>
+                </label>
+              )}
 
               <input
                 value={editForm.title}
@@ -1234,7 +1277,7 @@ export function GalleryPage() {
                     <option key={c} value={c}>{c}</option>
                   ))}
                 </select>
-                {current.kind === 'photo' && (
+                {(currentGroupId || current.kind === 'photo') && (
                   <input
                     value={editForm.location}
                     onChange={(e) => setEditForm((f) => ({ ...f, location: e.target.value }))}
@@ -1243,12 +1286,14 @@ export function GalleryPage() {
                   />
                 )}
               </div>
-              <input
-                type="datetime-local"
-                value={editForm.date}
-                onChange={(e) => setEditForm((f) => ({ ...f, date: e.target.value }))}
-                className="mb-3 w-full rounded-xl bg-white/5 px-4 py-2.5 font-mono text-sm outline-none ring-1 ring-white/10 [color-scheme:dark] focus:ring-cyan/50"
-              />
+              {!currentGroupId && (
+                <input
+                  type="datetime-local"
+                  value={editForm.date}
+                  onChange={(e) => setEditForm((f) => ({ ...f, date: e.target.value }))}
+                  className="mb-3 w-full rounded-xl bg-white/5 px-4 py-2.5 font-mono text-sm outline-none ring-1 ring-white/10 [color-scheme:dark] focus:ring-cyan/50"
+                />
+              )}
 
               {editError && <p className="mb-3 font-mono text-xs text-pink">{editError}</p>}
 

@@ -305,6 +305,54 @@ public class MediaController {
         return ResponseEntity.noContent().build();
     }
 
+    public record GroupUpdateRequest(String title, String description, String category, String location) {}
+
+    /** Edits the shared metadata (title/description/category/location) of every item in a
+     *  multi-item post at once — the per-item file/date fields stay editable only one at a time
+     *  via {@link #updatePhoto} / {@link #updateVideo}. */
+    @PutMapping("/groups/{groupId}")
+    public MediaUploadResult updateGroup(@PathVariable String groupId, @RequestBody GroupUpdateRequest update) {
+        List<Photo> groupPhotos = photos.findByGroupId(groupId);
+        List<Video> groupVideos = videos.findByGroupId(groupId);
+        if (groupPhotos.isEmpty() && groupVideos.isEmpty()) {
+            throw new NotFoundException("Group not found: " + groupId);
+        }
+        for (Photo photo : groupPhotos) {
+            if (update.title() != null && !update.title().isBlank()) photo.setTitle(update.title());
+            if (update.description() != null) photo.setDescription(update.description());
+            if (update.category() != null && !update.category().isBlank()) photo.setCategory(update.category());
+            if (update.location() != null) photo.setLocation(update.location());
+        }
+        for (Video video : groupVideos) {
+            if (update.title() != null && !update.title().isBlank()) video.setTitle(update.title());
+            if (update.description() != null) video.setDescription(update.description());
+            if (update.category() != null && !update.category().isBlank()) video.setCategory(update.category());
+        }
+        return new MediaUploadResult(photos.saveAll(groupPhotos), videos.saveAll(groupVideos));
+    }
+
+    /** Deletes every item in a multi-item post, plus their R2 objects (including the shared
+     *  music track, if any — the same key on every member, so it's only deleted once here). */
+    @DeleteMapping("/groups/{groupId}")
+    public ResponseEntity<Void> deleteGroup(@PathVariable String groupId) {
+        List<Photo> groupPhotos = photos.findByGroupId(groupId);
+        List<Video> groupVideos = videos.findByGroupId(groupId);
+        if (groupPhotos.isEmpty() && groupVideos.isEmpty()) {
+            throw new NotFoundException("Group not found: " + groupId);
+        }
+        String musicKey = !groupPhotos.isEmpty() ? groupPhotos.get(0).getMusicStorageKey()
+                : groupVideos.get(0).getMusicStorageKey();
+        photos.deleteAll(groupPhotos);
+        videos.deleteAll(groupVideos);
+        groupPhotos.forEach(p -> storage.delete(p.getStorageKey()));
+        groupVideos.forEach(v -> {
+            storage.delete(v.getStorageKey());
+            storage.delete(v.getThumbnailKey());
+        });
+        storage.delete(musicKey);
+        return ResponseEntity.noContent().build();
+    }
+
     public record GroupMemberRef(String kind, Long id) {}
 
     /** Reorders a multi-item post's carousel: `order` is the full member list (mixed photos/videos)
