@@ -160,6 +160,14 @@ function moveItem<T>(arr: T[], from: number, to: number): T[] {
   return next
 }
 
+/** Every photo/video sharing a groupId, sorted by position — a post's full member list. */
+function membersOfGroup(photos: Photo[], videos: Video[], groupId: string): GroupMember[] {
+  return [
+    ...photos.filter((p) => p.groupId === groupId).map((photo): GroupMember => ({ kind: 'photo', photo })),
+    ...videos.filter((v) => v.groupId === groupId).map((video): GroupMember => ({ kind: 'video', video })),
+  ].sort((a, b) => (a.kind === 'photo' ? a.photo.position ?? 0 : a.video.position ?? 0) - (b.kind === 'photo' ? b.photo.position ?? 0 : b.video.position ?? 0))
+}
+
 function emptyUploadForm() {
   return {
     title: '',
@@ -608,6 +616,26 @@ export function GalleryPage() {
 
   const current = lightbox !== null ? viewerItems[lightbox] : null
   const currentGroupId = current?.kind === 'photo' ? current.photo.groupId : current?.kind === 'video' ? current.video.groupId : null
+  const groupMembers = currentGroupId ? membersOfGroup(photos, videos, currentGroupId) : []
+
+  async function removeGroupMember(member: GroupMember) {
+    if (!confirm('Remove this item from the post?')) return
+    try {
+      if (member.kind === 'photo') {
+        await api.deletePhoto(member.photo.id)
+        setPhotos((prev) => prev.filter((p) => p.id !== member.photo.id))
+      } else {
+        await api.deleteVideo(member.video.id)
+        setVideos((prev) => prev.filter((v) => v.id !== member.video.id))
+      }
+      // the flat viewer list just shifted shape — safest to back out to the feed rather than
+      // risk `lightbox` now pointing at a different item than before the removal
+      setShowEdit(false)
+      setLightbox(null)
+    } catch {
+      alert('could not remove item')
+    }
+  }
 
   // TikTok-style background track: photos have no audio of their own, so a post's attached
   // music (if any) loops behind the viewer while a photo from that post is on screen. Videos
@@ -816,11 +844,7 @@ export function GalleryPage() {
 
   function openReorder() {
     if (!currentGroupId) return
-    const members: GroupMember[] = [
-      ...photos.filter((p) => p.groupId === currentGroupId).map((photo): GroupMember => ({ kind: 'photo', photo })),
-      ...videos.filter((v) => v.groupId === currentGroupId).map((video): GroupMember => ({ kind: 'video', video })),
-    ].sort((a, b) => (a.kind === 'photo' ? a.photo.position ?? 0 : a.video.position ?? 0) - (b.kind === 'photo' ? b.photo.position ?? 0 : b.video.position ?? 0))
-    setReorderMembers(members)
+    setReorderMembers(membersOfGroup(photos, videos, currentGroupId))
     setReorderError(null)
     setShowReorder(true)
   }
@@ -1367,9 +1391,35 @@ export function GalleryPage() {
               </div>
 
               {currentGroupId && (
-                <p className="mb-3 font-mono text-[10px] text-faint">
-                  applies to all {current.groupTotal} items in this post
-                </p>
+                <>
+                  <p className="mb-3 font-mono text-[10px] text-faint">
+                    applies to all {current.groupTotal} items in this post
+                  </p>
+                  <div className="mb-4 flex flex-wrap gap-2">
+                    {groupMembers.map((member) => {
+                      const thumb = member.kind === 'photo' ? member.photo.thumbnailUrl : member.video.thumbnailUrl
+                      const key = member.kind === 'photo' ? `photo-${member.photo.id}` : `video-${member.video.id}`
+                      return (
+                        <div key={key} className="group/tile relative size-16 shrink-0 overflow-hidden rounded-lg bg-black/40 ring-1 ring-white/10">
+                          <img src={thumb} alt="" className="size-full object-cover" />
+                          {member.kind === 'video' && (
+                            <div className="absolute inset-0 grid place-items-center bg-black/30">
+                              <Play size={13} className="text-ink" fill="currentColor" />
+                            </div>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => removeGroupMember(member)}
+                            className="absolute right-0.5 top-0.5 grid size-5 place-items-center rounded-full bg-black/70 text-ink opacity-100 transition hover:bg-pink/80 md:opacity-0 md:group-hover/tile:opacity-100"
+                            aria-label="Remove from post"
+                          >
+                            <X size={11} />
+                          </button>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </>
               )}
 
               {!currentGroupId && (
