@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import axios from 'axios'
 import { useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
-import { X, ChevronLeft, ChevronRight, MapPin, Calendar, Search, Plus, Trash2, Upload, Play, Clock, Pencil, Eye } from 'lucide-react'
+import { X, ChevronLeft, ChevronRight, MapPin, Calendar, Search, Plus, Trash2, Upload, Play, Clock, Pencil, Eye, Music, Volume2, VolumeX } from 'lucide-react'
 import { PageShell, SectionHeading, Reveal } from '../components/ui'
 import { api } from '../lib/api'
 import type { Photo, Video } from '../lib/types'
@@ -136,6 +136,7 @@ function emptyUploadForm() {
     category: 'life' as (typeof uploadCategories)[number],
     location: '',
     files: [] as File[],
+    music: null as File | null,
   }
 }
 
@@ -462,6 +463,35 @@ export function GalleryPage() {
 
   const current = lightbox !== null ? viewerItems[lightbox] : null
 
+  // TikTok-style background track: photos have no audio of their own, so a post's attached
+  // music (if any) loops behind the viewer while a photo from that post is on screen. Videos
+  // carry their own audio track already, so the background music pauses while one is showing —
+  // it picks back up (without restarting) once the viewer returns to a photo in the same post.
+  const musicRef = useRef<HTMLAudioElement>(null)
+  const lastMusicUrlRef = useRef<string | null>(null)
+  const [musicMuted, setMusicMuted] = useState(false)
+  const activeMusicUrl = current?.kind === 'photo' ? current.photo.musicUrl ?? null : null
+
+  useEffect(() => {
+    const audio = musicRef.current
+    if (!audio) return
+    if (!activeMusicUrl) {
+      audio.pause()
+      lastMusicUrlRef.current = null
+      return
+    }
+    if (lastMusicUrlRef.current !== activeMusicUrl) {
+      audio.src = activeMusicUrl
+      audio.currentTime = 0
+      lastMusicUrlRef.current = activeMusicUrl
+    }
+    audio.play().catch(() => {})
+  }, [activeMusicUrl])
+
+  useEffect(() => {
+    if (musicRef.current) musicRef.current.muted = musicMuted
+  }, [musicMuted])
+
   // record a view once per item per session, reflected locally so the owner-only view count updates live
   const viewedIdsRef = useRef<Set<string>>(new Set())
   useEffect(() => {
@@ -497,6 +527,7 @@ export function GalleryPage() {
           description: uploadForm.description.trim() || undefined,
           category: uploadForm.category,
           location: uploadForm.location.trim() || undefined,
+          music: uploadForm.music ?? undefined,
         },
         setUploadProgress,
       )
@@ -742,6 +773,8 @@ export function GalleryPage() {
             exit={{ opacity: 0 }}
             onClick={() => setLightbox(null)}
           >
+            <audio ref={musicRef} loop hidden />
+
             <button
               className="absolute right-5 top-5 z-10 rounded-full bg-white/10 p-2.5 text-ink transition hover:bg-white/20"
               onClick={() => setLightbox(null)}
@@ -749,6 +782,19 @@ export function GalleryPage() {
             >
               <X size={18} />
             </button>
+
+            {activeMusicUrl && (
+              <button
+                className="absolute right-16 top-5 z-10 rounded-full bg-white/10 p-2.5 text-ink transition hover:bg-white/20"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setMusicMuted((m) => !m)
+                }}
+                aria-label={musicMuted ? 'Unmute music' : 'Mute music'}
+              >
+                {musicMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
+              </button>
+            )}
 
             <button
               className="absolute left-3 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white/10 p-3 text-ink transition hover:bg-white/20 disabled:pointer-events-none disabled:opacity-30 md:left-8"
@@ -948,6 +994,32 @@ export function GalleryPage() {
               <p className="mb-3 min-h-[1em] font-mono text-[10px] text-faint">
                 {uploadForm.files.length > 1 && `${uploadForm.files.length} files · one title/caption applies to all`}
               </p>
+
+              {uploadForm.music ? (
+                <div className="mb-3 flex items-center gap-2 rounded-xl bg-white/5 px-4 py-2.5 ring-1 ring-white/10">
+                  <Music size={14} className="shrink-0 text-violet" />
+                  <span className="min-w-0 flex-1 truncate font-mono text-xs text-muted">{uploadForm.music.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => setUploadForm((f) => ({ ...f, music: null }))}
+                    className="shrink-0 text-faint transition hover:text-pink"
+                    aria-label="Remove music"
+                  >
+                    <X size={13} />
+                  </button>
+                </div>
+              ) : (
+                <label className="mb-3 flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-white/15 px-4 py-2.5 text-center font-mono text-xs text-muted transition hover:border-violet/40 hover:text-violet">
+                  <Music size={14} />
+                  add music (optional) — replays while viewers browse this post
+                  <input
+                    type="file"
+                    accept="audio/*"
+                    className="hidden"
+                    onChange={(e) => setUploadForm((f) => ({ ...f, music: e.target.files?.[0] ?? null }))}
+                  />
+                </label>
+              )}
 
               <input
                 value={uploadForm.title}

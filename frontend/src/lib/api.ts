@@ -134,7 +134,7 @@ export const api = {
 
   async uploadMedia(
     files: File[],
-    meta: { title: string; description?: string; category: string; location?: string },
+    meta: { title: string; description?: string; category: string; location?: string; music?: File },
     onProgress?: (percent: number) => void,
   ): Promise<{ photos: Photo[]; videos: Video[] }> {
     const form = new FormData()
@@ -143,6 +143,7 @@ export const api = {
     if (meta.description) form.append('description', meta.description)
     form.append('category', meta.category)
     if (meta.location) form.append('location', meta.location)
+    if (meta.music) form.append('music', meta.music)
     const { data } = await client.post('/media/upload-batch', form, {
       headers: { 'Content-Type': 'multipart/form-data' },
       // videos in the batch get transcoded server-side after transfer, same ceiling as a video upload

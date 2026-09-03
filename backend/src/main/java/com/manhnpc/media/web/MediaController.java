@@ -67,7 +67,7 @@ public class MediaController {
                              @RequestParam(required = false) String description,
                              @RequestParam(defaultValue = "life") String category,
                              @RequestParam(required = false) String location) throws IOException {
-        return savePhoto(file, title, description, category, location, null, 0);
+        return savePhoto(file, title, description, category, location, null, 0, null);
     }
 
     @PostMapping("/photos/upload-batch")
@@ -80,13 +80,13 @@ public class MediaController {
         String groupId = files.size() > 1 ? UUID.randomUUID().toString() : null;
         List<Photo> saved = new ArrayList<>();
         for (int i = 0; i < files.size(); i++) {
-            saved.add(savePhoto(files.get(i), title, description, category, location, groupId, i));
+            saved.add(savePhoto(files.get(i), title, description, category, location, groupId, i, null));
         }
         return saved;
     }
 
     private Photo savePhoto(MultipartFile file, String title, String description, String category, String location,
-                             String groupId, int position) throws IOException {
+                             String groupId, int position, UploadResult music) throws IOException {
         UploadResult result = storage.upload(file, "photos");
         Photo photo = Photo.builder()
                 .title(title)
@@ -96,6 +96,8 @@ public class MediaController {
                 .storageKey(result.key())
                 .groupId(groupId)
                 .position(position)
+                .musicUrl(music != null ? music.url() : null)
+                .musicStorageKey(music != null ? music.key() : null)
                 .category(category)
                 .location(location)
                 .takenAt(LocalDateTime.now())
@@ -107,24 +109,28 @@ public class MediaController {
     }
 
     /** Mixed photo+video post: one shared groupId/title/caption across whatever file types come in,
-     *  routed to the right table by content-type so a single post can carry both. */
+     *  routed to the right table by content-type so a single post can carry both. An optional
+     *  `music` track is uploaded once and stamped onto every item in the post (TikTok-style
+     *  background track replayed by the viewer while browsing that post). */
     @PostMapping("/upload-batch")
     @ResponseStatus(HttpStatus.CREATED)
     public MediaUploadResult uploadMediaBatch(@RequestParam("files") List<MultipartFile> files,
                                               @RequestParam(defaultValue = "Untitled post") String title,
                                               @RequestParam(required = false) String description,
                                               @RequestParam(defaultValue = "life") String category,
-                                              @RequestParam(required = false) String location) throws IOException {
+                                              @RequestParam(required = false) String location,
+                                              @RequestParam(required = false) MultipartFile music) throws IOException {
         String groupId = files.size() > 1 ? UUID.randomUUID().toString() : null;
+        UploadResult musicResult = (music != null && !music.isEmpty()) ? storage.upload(music, "post-music") : null;
         List<Photo> savedPhotos = new ArrayList<>();
         List<Video> savedVideos = new ArrayList<>();
         for (int i = 0; i < files.size(); i++) {
             MultipartFile file = files.get(i);
             String contentType = file.getContentType();
             if (contentType != null && contentType.startsWith("video/")) {
-                savedVideos.add(processAndSaveVideo(file, title, description, category, groupId, i));
+                savedVideos.add(processAndSaveVideo(file, title, description, category, groupId, i, musicResult));
             } else {
-                savedPhotos.add(savePhoto(file, title, description, category, location, groupId, i));
+                savedPhotos.add(savePhoto(file, title, description, category, location, groupId, i, musicResult));
             }
         }
         return new MediaUploadResult(savedPhotos, savedVideos);
@@ -138,7 +144,7 @@ public class MediaController {
                              @RequestParam(defaultValue = "Untitled video") String title,
                              @RequestParam(required = false) String description,
                              @RequestParam(defaultValue = "life") String category) throws IOException {
-        return processAndSaveVideo(file, title, description, category, null, 0);
+        return processAndSaveVideo(file, title, description, category, null, 0, null);
     }
 
     @PostMapping("/videos/upload-batch")
@@ -150,13 +156,13 @@ public class MediaController {
         String groupId = files.size() > 1 ? UUID.randomUUID().toString() : null;
         List<Video> saved = new ArrayList<>();
         for (int i = 0; i < files.size(); i++) {
-            saved.add(processAndSaveVideo(files.get(i), title, description, category, groupId, i));
+            saved.add(processAndSaveVideo(files.get(i), title, description, category, groupId, i, null));
         }
         return saved;
     }
 
     private Video processAndSaveVideo(MultipartFile file, String title, String description, String category,
-                                       String groupId, int position) throws IOException {
+                                       String groupId, int position, UploadResult music) throws IOException {
         if (file == null || file.isEmpty()) {
             throw new IllegalArgumentException("Uploaded file is empty");
         }
@@ -179,6 +185,8 @@ public class MediaController {
                     .thumbnailKey(thumbResult.key())
                     .groupId(groupId)
                     .position(position)
+                    .musicUrl(music != null ? music.url() : null)
+                    .musicStorageKey(music != null ? music.key() : null)
                     .durationSeconds(processed.durationSeconds())
                     .category(category)
                     .createdAt(LocalDateTime.now())

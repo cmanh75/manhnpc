@@ -30,6 +30,7 @@ export interface Photo {
   thumbnailUrl: string
   groupId?: string | null
   position?: number
+  musicUrl?: string | null
   category: 'travel' | 'food' | 'code' | 'life'
   location: string
   takenAt: string
@@ -47,6 +48,7 @@ export interface Video {
   thumbnailUrl: string
   groupId?: string | null
   position?: number
+  musicUrl?: string | null
   durationSeconds: number
   category: string
   createdAt: string

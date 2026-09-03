@@ -51,6 +51,12 @@ public class Video {
     @Builder.Default
     private Integer position = 0;
 
+    /** Public R2 URL of the music track attached to this post (same value on every member of {@link #groupId}), if any. */
+    private String musicUrl;
+
+    /** R2 object key for {@link #musicUrl} — shared by every member of the group, so only deleted when the whole post is gone. */
+    private String musicStorageKey;
+
     private int durationSeconds;
 
     private String category;
