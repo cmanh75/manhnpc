@@ -129,6 +129,7 @@ public class PostController {
         Post post = posts.findById(id).orElseThrow(() -> new NotFoundException("Post not found: " + id));
         posts.deleteById(id);
         storage.delete(post.getMusicStorageKey());
+        storage.deleteByUrl(post.getCoverImage());
         return ResponseEntity.noContent().build();
     }
 

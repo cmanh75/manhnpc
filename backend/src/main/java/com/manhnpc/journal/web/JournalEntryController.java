@@ -2,11 +2,15 @@ package com.manhnpc.journal.web;
 
 import com.manhnpc.journal.model.JournalEntry;
 import com.manhnpc.journal.repository.JournalEntryRepository;
+import com.manhnpc.common.storage.R2StorageService;
 import com.manhnpc.common.web.error.NotFoundException;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -24,10 +28,15 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/journal")
 public class JournalEntryController {
 
-    private final JournalEntryRepository entries;
+    /** Matches markdown image syntax `![alt](url)`, as inserted by the journal editor's image upload. */
+    private static final Pattern IMAGE_URL_PATTERN = Pattern.compile("!\\[[^\\]]*]\\(([^)]+)\\)");
 
-    public JournalEntryController(JournalEntryRepository entries) {
+    private final JournalEntryRepository entries;
+    private final R2StorageService storage;
+
+    public JournalEntryController(JournalEntryRepository entries, R2StorageService storage) {
         this.entries = entries;
+        this.storage = storage;
     }
 
     @GetMapping
@@ -71,11 +80,24 @@ public class JournalEntryController {
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
-        if (!entries.existsById(id)) {
-            throw new NotFoundException("Journal entry not found: " + id);
-        }
+        JournalEntry entry = entries.findById(id)
+                .orElseThrow(() -> new NotFoundException("Journal entry not found: " + id));
         entries.deleteById(id);
+        imageUrlsIn(entry.getContent()).forEach(storage::deleteByUrl);
         return ResponseEntity.noContent().build();
+    }
+
+    /** Every R2 image URL embedded via markdown `![alt](url)` in a journal entry's content. */
+    private static List<String> imageUrlsIn(String content) {
+        if (content == null) {
+            return List.of();
+        }
+        List<String> urls = new ArrayList<>();
+        Matcher matcher = IMAGE_URL_PATTERN.matcher(content);
+        while (matcher.find()) {
+            urls.add(matcher.group(1));
+        }
+        return urls;
     }
 
     private static List<String> tagsOf(JournalEntry entry) {

@@ -113,6 +113,16 @@ public class R2StorageService {
         client().deleteObject(DeleteObjectRequest.builder().bucket(bucket).key(key).build());
     }
 
+    /** Deletes the object a public URL points at, for callers that only have the URL on hand
+     *  (e.g. an image URL embedded inline in markdown) rather than a stored key. No-ops for a
+     *  blank/null URL or one that isn't under this bucket's public base (external/seeded URLs). */
+    public void deleteByUrl(String url) {
+        if (url == null || url.isBlank() || !url.startsWith(publicBaseUrl + "/")) {
+            return;
+        }
+        delete(url.substring(publicBaseUrl.length() + 1));
+    }
+
     private static String extensionOf(String originalFilename) {
         if (originalFilename == null) {
             return "";
