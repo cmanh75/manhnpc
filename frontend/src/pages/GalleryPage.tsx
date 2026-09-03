@@ -284,6 +284,120 @@ function BackgroundMusic({ url, suppressed = false }: { url: string; suppressed?
 }
 
 /**
+ * Pinch/double-click/wheel zoom for a viewed photo, with drag-to-pan while zoomed. All gesture
+ * state (scale, pan, and whether a gesture is actively in progress) lives here, not in the parent
+ * viewer — a pinch fires touchmove dozens of times a second, and re-rendering the entire gallery
+ * page on every one of those was the cause of the stutter on mobile. `onZoomChange` only fires on
+ * an actual zoom-in/zoom-out transition, so lifting that little bit further up (to disable the
+ * figure's own swipe-to-navigate drag while zoomed) stays cheap.
+ */
+function ZoomableImage({ src, alt, onZoomChange }: { src: string; alt: string; onZoomChange: (zoomed: boolean) => void }) {
+  const [scale, setScale] = useState(1)
+  const [pan, setPan] = useState({ x: 0, y: 0 })
+  const [gesturing, setGesturing] = useState(false)
+  const panStartRef = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null)
+  const lastTapRef = useRef(0)
+  const pinchRef = useRef<{ dist: number; scale: number } | null>(null)
+
+  useEffect(() => {
+    onZoomChange(scale > 1)
+  }, [scale, onZoomChange])
+
+  function toggleZoom() {
+    setGesturing(false)
+    setScale((s) => (s > 1 ? 1 : 2.5))
+    setPan({ x: 0, y: 0 })
+  }
+
+  function handleWheel(e: React.WheelEvent) {
+    e.preventDefault()
+    e.stopPropagation()
+    setScale((s) => {
+      const next = Math.min(4, Math.max(1, s - e.deltaY * 0.0015))
+      if (next === 1) setPan({ x: 0, y: 0 })
+      return next
+    })
+  }
+
+  function handlePointerDown(e: React.PointerEvent<HTMLImageElement>) {
+    if (scale <= 1) return
+    e.stopPropagation()
+    e.currentTarget.setPointerCapture(e.pointerId)
+    setGesturing(true)
+    panStartRef.current = { x: e.clientX, y: e.clientY, panX: pan.x, panY: pan.y }
+  }
+
+  function handlePointerMove(e: React.PointerEvent<HTMLImageElement>) {
+    if (!panStartRef.current) return
+    e.stopPropagation()
+    const limit = 120 * (scale - 1)
+    setPan({
+      x: Math.min(limit, Math.max(-limit, panStartRef.current.panX + (e.clientX - panStartRef.current.x))),
+      y: Math.min(limit, Math.max(-limit, panStartRef.current.panY + (e.clientY - panStartRef.current.y))),
+    })
+  }
+
+  function handlePointerUp() {
+    panStartRef.current = null
+    setGesturing(false)
+  }
+
+  function touchDistance(a: React.Touch, b: React.Touch) {
+    return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY)
+  }
+
+  function handleTouchStart(e: React.TouchEvent) {
+    if (e.touches.length === 2) {
+      setGesturing(true)
+      pinchRef.current = { dist: touchDistance(e.touches[0], e.touches[1]), scale }
+    } else if (e.touches.length === 1) {
+      const now = Date.now()
+      if (now - lastTapRef.current < 300) toggleZoom()
+      lastTapRef.current = now
+    }
+  }
+
+  function handleTouchMove(e: React.TouchEvent) {
+    if (e.touches.length !== 2 || !pinchRef.current) return
+    e.preventDefault()
+    const dist = touchDistance(e.touches[0], e.touches[1])
+    const next = Math.min(4, Math.max(1, pinchRef.current.scale * (dist / pinchRef.current.dist)))
+    setScale(next)
+    if (next === 1) setPan({ x: 0, y: 0 })
+  }
+
+  function handleTouchEnd(e: React.TouchEvent) {
+    if (e.touches.length < 2) {
+      pinchRef.current = null
+      setGesturing(false)
+    }
+  }
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      draggable={false}
+      onDoubleClick={toggleZoom}
+      onWheel={handleWheel}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerUp}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`, willChange: 'transform' }}
+      className={clsx(
+        'mx-auto block max-h-[74svh] max-w-full touch-none select-none rounded-xl object-contain shadow-2xl',
+        !gesturing && 'transition-transform duration-150',
+        scale > 1 ? 'cursor-grab active:cursor-grabbing' : 'cursor-zoom-in',
+      )}
+    />
+  )
+}
+
+/**
  * Video feed card: shows the thumbnail by default. On hover-capable devices it autoplays muted
  * inline when the pointer enters; on touch devices (no hover) it autoplays when scrolled to the
  * center of the viewport instead, via IntersectionObserver.
@@ -419,6 +533,9 @@ function MediaGroupCarousel({
   const trackRef = useRef<HTMLDivElement>(null)
   const drag = useDragToScroll(trackRef)
   const [inView, setInView] = useState(false)
+  // once the visitor has manually browsed this post's slides (dragged/swiped or tapped an arrow),
+  // auto-advance stops for good — it's only meant to catch the eye of someone scrolling past.
+  const [userInteracted, setUserInteracted] = useState(false)
   const musicUrl = members.map((m) => (m.kind === 'photo' ? m.photo.musicUrl : m.video.musicUrl)).find(Boolean) ?? null
   const activeIsVideo = members[active]?.kind === 'video'
 
@@ -451,10 +568,10 @@ function MediaGroupCarousel({
   // post (fullscreen viewer open), this stops and stays on whatever they clicked. Re-running on
   // every `active` change (including from a manual swipe) restarts the 3s window for free.
   useEffect(() => {
-    if (!inView || viewerOpen || members.length <= 1) return
+    if (!inView || viewerOpen || userInteracted || members.length <= 1) return
     const timer = setTimeout(() => goTo((active + 1) % members.length), 3000)
     return () => clearTimeout(timer)
-  }, [inView, viewerOpen, active, members.length])
+  }, [inView, viewerOpen, userInteracted, active, members.length])
 
   return (
     <div ref={containerRef} className="relative aspect-[4/5] w-full overflow-hidden bg-black">
@@ -462,7 +579,12 @@ function MediaGroupCarousel({
       <div
         ref={trackRef}
         onScroll={handleScroll}
-        {...drag}
+        onPointerDown={(e) => {
+          setUserInteracted(true)
+          drag.onPointerDown(e)
+        }}
+        onTouchStart={() => setUserInteracted(true)}
+        onClickCapture={drag.onClickCapture}
         className="flex h-full cursor-grab snap-x snap-mandatory overflow-x-auto scroll-smooth select-none [&::-webkit-scrollbar]:hidden active:cursor-grabbing"
         style={{ scrollbarWidth: 'none' }}
       >
@@ -664,82 +786,11 @@ export function GalleryPage() {
     }
   }
 
-  // Pinch/double-click/wheel zoom on a viewed photo, with drag-to-pan while zoomed in. Resets on
-  // navigation. While zoomed, the figure's own swipe-to-navigate drag is disabled (see the `drag`
-  // prop below) so panning the image doesn't fight with swiping to the next item.
-  const [zoomScale, setZoomScale] = useState(1)
-  const [pan, setPan] = useState({ x: 0, y: 0 })
-  const panStartRef = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null)
-  const lastTapRef = useRef(0)
-  const pinchRef = useRef<{ dist: number; scale: number } | null>(null)
-
-  useEffect(() => {
-    setZoomScale(1)
-    setPan({ x: 0, y: 0 })
-  }, [lightbox])
-
-  function toggleZoom() {
-    setZoomScale((s) => (s > 1 ? 1 : 2.5))
-    setPan({ x: 0, y: 0 })
-  }
-
-  function handleWheelZoom(e: React.WheelEvent) {
-    e.preventDefault()
-    e.stopPropagation()
-    setZoomScale((s) => {
-      const next = Math.min(4, Math.max(1, s - e.deltaY * 0.0015))
-      if (next === 1) setPan({ x: 0, y: 0 })
-      return next
-    })
-  }
-
-  function handleImagePointerDown(e: React.PointerEvent<HTMLImageElement>) {
-    if (zoomScale <= 1) return
-    e.stopPropagation()
-    e.currentTarget.setPointerCapture(e.pointerId)
-    panStartRef.current = { x: e.clientX, y: e.clientY, panX: pan.x, panY: pan.y }
-  }
-
-  function handleImagePointerMove(e: React.PointerEvent<HTMLImageElement>) {
-    if (!panStartRef.current) return
-    e.stopPropagation()
-    const limit = 120 * (zoomScale - 1)
-    setPan({
-      x: Math.min(limit, Math.max(-limit, panStartRef.current.panX + (e.clientX - panStartRef.current.x))),
-      y: Math.min(limit, Math.max(-limit, panStartRef.current.panY + (e.clientY - panStartRef.current.y))),
-    })
-  }
-
-  function handleImagePointerUp() {
-    panStartRef.current = null
-  }
-
-  function touchDistance(a: React.Touch, b: React.Touch) {
-    return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY)
-  }
-
-  function handleImageTouchStart(e: React.TouchEvent) {
-    if (e.touches.length === 2) {
-      pinchRef.current = { dist: touchDistance(e.touches[0], e.touches[1]), scale: zoomScale }
-    } else if (e.touches.length === 1) {
-      const now = Date.now()
-      if (now - lastTapRef.current < 300) toggleZoom()
-      lastTapRef.current = now
-    }
-  }
-
-  function handleImageTouchMove(e: React.TouchEvent) {
-    if (e.touches.length !== 2 || !pinchRef.current) return
-    e.preventDefault()
-    const dist = touchDistance(e.touches[0], e.touches[1])
-    const next = Math.min(4, Math.max(1, pinchRef.current.scale * (dist / pinchRef.current.dist)))
-    setZoomScale(next)
-    if (next === 1) setPan({ x: 0, y: 0 })
-  }
-
-  function handleImageTouchEnd(e: React.TouchEvent) {
-    if (e.touches.length < 2) pinchRef.current = null
-  }
+  // Whether the currently-viewed photo is pinch/double-click zoomed — owned by ZoomableImage
+  // itself (touch/pointer-move-driven state stays local to that small component so a pinch
+  // gesture doesn't re-render this whole page every frame); this only flips on zoom-in/zoom-out,
+  // so it's cheap to lift just far enough to disable the figure's own swipe-to-navigate drag.
+  const [photoZoomed, setPhotoZoomed] = useState(false)
 
   // TikTok-style background track: photos have no audio of their own, so a post's attached
   // music (if any) loops behind the viewer while a photo from that post is on screen. Videos
@@ -1165,9 +1216,9 @@ export function GalleryPage() {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.3 }}
-              className={clsx('max-h-[86svh] max-w-full', zoomScale === 1 && 'cursor-grab active:cursor-grabbing')}
+              className={clsx('max-h-[86svh] max-w-full', !photoZoomed && 'cursor-grab active:cursor-grabbing')}
               onClick={(e) => e.stopPropagation()}
-              drag={current.kind === 'photo' && zoomScale > 1 ? false : 'x'}
+              drag={current.kind === 'photo' && photoZoomed ? false : 'x'}
               dragConstraints={{ left: 0, right: 0 }}
               dragElastic={0.6}
               onDragEnd={(_, info) => {
@@ -1180,25 +1231,7 @@ export function GalleryPage() {
               }}
             >
               {current.kind === 'photo' ? (
-                <img
-                  src={current.photo.url}
-                  alt={current.photo.title}
-                  draggable={false}
-                  onDoubleClick={toggleZoom}
-                  onWheel={handleWheelZoom}
-                  onPointerDown={handleImagePointerDown}
-                  onPointerMove={handleImagePointerMove}
-                  onPointerUp={handleImagePointerUp}
-                  onPointerCancel={handleImagePointerUp}
-                  onTouchStart={handleImageTouchStart}
-                  onTouchMove={handleImageTouchMove}
-                  onTouchEnd={handleImageTouchEnd}
-                  style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoomScale})` }}
-                  className={clsx(
-                    'mx-auto block max-h-[74svh] max-w-full touch-none select-none rounded-xl object-contain shadow-2xl transition-transform duration-150',
-                    zoomScale > 1 ? 'cursor-grab active:cursor-grabbing' : 'cursor-zoom-in',
-                  )}
-                />
+                <ZoomableImage src={current.photo.url} alt={current.photo.title} onZoomChange={setPhotoZoomed} />
               ) : (
                 <video
                   src={current.video.url}
