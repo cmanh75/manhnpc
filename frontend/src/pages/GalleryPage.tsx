@@ -13,6 +13,24 @@ import { useAppStore } from '../store/useAppStore'
 const categories = ['all', 'travel', 'food', 'code', 'life'] as const
 const uploadCategories = categories.filter((c) => c !== 'all')
 
+/**
+ * Browsers block unmuted `audio.play()` until the visitor has made a real gesture (click/tap/key)
+ * anywhere on the page — module-level, not per-card, since one gesture unlocks audio for the rest
+ * of the session. The first such gesture retries every currently-mounted BackgroundMusic instance,
+ * so scrolling to a post's music after clicking anything else on the page (a nav link, the page
+ * itself) is enough — the visitor doesn't have to find and tap the music icon specifically.
+ */
+const audioUnlockRetries = new Set<() => void>()
+if (typeof window !== 'undefined') {
+  const unlockAudio = () => {
+    audioUnlockRetries.forEach((retry) => retry())
+    window.removeEventListener('pointerdown', unlockAudio)
+    window.removeEventListener('keydown', unlockAudio)
+  }
+  window.addEventListener('pointerdown', unlockAudio)
+  window.addEventListener('keydown', unlockAudio)
+}
+
 /** A single photo or video inside a mixed multi-item post. */
 type GroupMember = { kind: 'photo'; photo: Photo } | { kind: 'video'; video: Video }
 
@@ -155,17 +173,20 @@ function useHoverCapable() {
 }
 
 /**
- * Instagram-style feed music: loops a post's attached track for as long as its card is scrolled
- * into the center of the viewport — no click needed. Starts muted since browsers block unmuted
- * autoplay without a user gesture; a small mute/unmute toggle sits in the corner of the card.
- * `suppressed` pauses it without unmounting (so the muted preference survives) — used when the
- * card's active slide is a video with its own audio, or the fullscreen viewer has taken over.
+ * Instagram-style feed music: loops a post's attached track, with sound, for as long as its card
+ * is scrolled into the center of the viewport — no click needed. Tries to autoplay unmuted; if the
+ * browser blocks that (no gesture yet this session), it stays paused and registers itself to be
+ * retried the moment the visitor clicks/taps/types anywhere on the page (see `audioUnlockRetries`
+ * above) — so any interaction unlocks it, not just tapping the music icon specifically. The icon
+ * still works as a direct, always-available fallback. `suppressed` pauses without unmounting (so
+ * the mute preference survives) — used when the card's active slide is a video with its own audio,
+ * or the fullscreen viewer has taken over.
  */
 function BackgroundMusic({ url, suppressed = false }: { url: string; suppressed?: boolean }) {
   const wrapRef = useRef<HTMLDivElement>(null)
   const audioRef = useRef<HTMLAudioElement>(null)
   const [inView, setInView] = useState(false)
-  const [muted, setMuted] = useState(true)
+  const [muted, setMuted] = useState(false)
 
   useEffect(() => {
     const el = wrapRef.current
@@ -189,6 +210,17 @@ function BackgroundMusic({ url, suppressed = false }: { url: string; suppressed?
   }, [inView, suppressed])
 
   useEffect(() => {
+    const retry = () => {
+      const audio = audioRef.current
+      if (audio && inView && !suppressed) audio.play().catch(() => {})
+    }
+    audioUnlockRetries.add(retry)
+    return () => {
+      audioUnlockRetries.delete(retry)
+    }
+  }, [inView, suppressed])
+
+  useEffect(() => {
     if (audioRef.current) audioRef.current.muted = muted
   }, [muted])
 
@@ -200,11 +232,12 @@ function BackgroundMusic({ url, suppressed = false }: { url: string; suppressed?
         onClick={(e) => {
           e.stopPropagation()
           setMuted((m) => !m)
+          audioRef.current?.play().catch(() => {})
         }}
-        className="pointer-events-auto absolute bottom-3 left-3 z-10 grid size-8 place-items-center rounded-full bg-black/50 text-ink backdrop-blur transition hover:bg-black/70"
+        className="pointer-events-auto absolute bottom-3 left-3 z-10 grid size-11 place-items-center rounded-full bg-black/55 text-ink backdrop-blur transition hover:bg-black/75"
         aria-label={muted ? 'Unmute music' : 'Mute music'}
       >
-        {muted ? <VolumeX size={14} /> : <Volume2 size={14} />}
+        {muted ? <VolumeX size={20} /> : <Volume2 size={20} />}
       </button>
     </div>
   )
