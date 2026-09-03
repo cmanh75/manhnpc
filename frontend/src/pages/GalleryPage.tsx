@@ -19,16 +19,21 @@ const uploadCategories = categories.filter((c) => c !== 'all')
  * of the session. The first such gesture retries every currently-mounted BackgroundMusic instance,
  * so scrolling to a post's music after clicking anything else on the page (a nav link, the page
  * itself) is enough — the visitor doesn't have to find and tap the music icon specifically.
+ *
+ * Registered on the CAPTURE phase, not bubble: nearly every interactive element in this app calls
+ * `e.stopPropagation()` on click (edit/delete/like buttons, carousel nav, etc.), which would stop
+ * a bubble-phase `window` listener from ever seeing those clicks. Capture fires top-down before
+ * any of that, so it sees every gesture regardless of what a handler further down does with it.
  */
 const audioUnlockRetries = new Set<() => void>()
 if (typeof window !== 'undefined') {
   const unlockAudio = () => {
     audioUnlockRetries.forEach((retry) => retry())
-    window.removeEventListener('pointerdown', unlockAudio)
-    window.removeEventListener('keydown', unlockAudio)
+    window.removeEventListener('pointerdown', unlockAudio, true)
+    window.removeEventListener('keydown', unlockAudio, true)
   }
-  window.addEventListener('pointerdown', unlockAudio)
-  window.addEventListener('keydown', unlockAudio)
+  window.addEventListener('pointerdown', unlockAudio, true)
+  window.addEventListener('keydown', unlockAudio, true)
 }
 
 /** A single photo or video inside a mixed multi-item post. */
@@ -580,6 +585,21 @@ export function GalleryPage() {
 
   const current = lightbox !== null ? viewerItems[lightbox] : null
   const currentGroupId = current?.kind === 'photo' ? current.photo.groupId : current?.kind === 'video' ? current.video.groupId : null
+
+  // TikTok-style auto-advance: inside a multi-item post, a photo slide moves to the next one
+  // after 3s on its own, wrapping back to the post's first item after its last — videos are left
+  // to play through instead (they already loop via onEnded below). Re-running this on every
+  // `lightbox` change means a manual swipe/arrow/keypress restarts the 3s window for free.
+  useEffect(() => {
+    if (lightbox === null || current?.kind !== 'photo' || !current.groupTotal || current.groupTotal <= 1) return
+    const groupIndex = current.groupIndex ?? 1
+    const groupStart = lightbox - (groupIndex - 1)
+    const isLast = groupIndex === current.groupTotal
+    const timer = setTimeout(() => {
+      setLightbox(isLast ? groupStart : lightbox + 1)
+    }, 3000)
+    return () => clearTimeout(timer)
+  }, [lightbox, current])
 
   // TikTok-style background track: photos have no audio of their own, so a post's attached
   // music (if any) loops behind the viewer while a photo from that post is on screen. Videos
