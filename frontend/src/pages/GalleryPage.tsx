@@ -274,7 +274,7 @@ function BackgroundMusic({ url, suppressed = false }: { url: string; suppressed?
           setMuted((m) => !m)
           if (audioRef.current) playExclusive(audioRef.current)
         }}
-        className="pointer-events-auto absolute bottom-3 left-3 z-10 grid size-11 place-items-center rounded-full bg-black/55 text-ink backdrop-blur transition hover:bg-black/75"
+        className="pointer-events-auto absolute bottom-3 left-3 z-10 grid size-11 place-items-center rounded-full bg-black/70 text-ink transition hover:bg-black/85"
         aria-label={muted ? 'Unmute music' : 'Mute music'}
       >
         {muted ? <VolumeX size={20} /> : <Volume2 size={20} />}
@@ -479,18 +479,8 @@ function ZoomableImage({ src, alt, onSwipe }: { src: string; alt: string; onSwip
  */
 function VideoTile({ video, title, onOpen }: { video: Video; title: string; onOpen: () => void }) {
   const containerRef = useRef<HTMLButtonElement>(null)
-  const videoRef = useRef<HTMLVideoElement>(null)
   const [playing, setPlaying] = useState(false)
   const hoverCapable = useHoverCapable()
-
-  useEffect(() => {
-    if (playing) {
-      videoRef.current?.play().catch(() => {})
-    } else if (videoRef.current) {
-      videoRef.current.pause()
-      videoRef.current.currentTime = 0
-    }
-  }, [playing])
 
   useEffect(() => {
     if (hoverCapable) return
@@ -522,27 +512,30 @@ function VideoTile({ video, title, onOpen }: { video: Video; title: string; onOp
           playing && 'opacity-0',
         )}
       />
-      <video
-        ref={videoRef}
-        src={video.url}
-        muted
-        loop
-        playsInline
-        preload="none"
-        className={clsx(
-          'absolute inset-0 size-full object-cover transition-opacity duration-300',
-          playing ? 'opacity-100' : 'opacity-0',
-        )}
-      />
+      {/* only mounted while actually playing — iOS Safari has a hard limit on simultaneously
+          active <video> elements per page, and a long feed with many video posts would otherwise
+          keep one real <video> per card in the DOM at all times even though almost none of them
+          are ever visible or playing */}
+      {playing && (
+        <video
+          src={video.url}
+          muted
+          loop
+          playsInline
+          autoPlay
+          preload="none"
+          className="absolute inset-0 size-full object-cover"
+        />
+      )}
       <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
       {!playing && (
         <div className="absolute inset-0 grid place-items-center">
-          <span className="grid size-14 place-items-center rounded-full bg-black/45 ring-1 ring-white/25 backdrop-blur transition duration-300 group-hover:scale-110 group-hover:bg-cyan/25 group-hover:ring-cyan/60">
+          <span className="grid size-14 place-items-center rounded-full bg-black/60 ring-1 ring-white/25 transition duration-300 group-hover:scale-110 group-hover:bg-cyan/25 group-hover:ring-cyan/60">
             <Play size={20} className="ml-1 text-ink transition group-hover:text-cyan" fill="currentColor" />
           </span>
         </div>
       )}
-      <span className="absolute bottom-3 right-3 flex items-center gap-1.5 rounded-md bg-black/60 px-2 py-1 font-mono text-[11px] text-ink backdrop-blur">
+      <span className="absolute bottom-3 right-3 flex items-center gap-1.5 rounded-md bg-black/75 px-2 py-1 font-mono text-[11px] text-ink">
         <Clock size={10} />
         {formatDuration(video.durationSeconds)}
       </span>
@@ -682,11 +675,11 @@ function MediaGroupCarousel({
             {member.kind === 'video' && (
               <>
                 <div className="absolute inset-0 grid place-items-center bg-black/20">
-                  <span className="grid size-14 place-items-center rounded-full bg-black/45 ring-1 ring-white/25 backdrop-blur">
+                  <span className="grid size-14 place-items-center rounded-full bg-black/60 ring-1 ring-white/25">
                     <Play size={20} className="ml-1 text-ink" fill="currentColor" />
                   </span>
                 </div>
-                <span className="absolute bottom-3 right-3 flex items-center gap-1.5 rounded-md bg-black/60 px-2 py-1 font-mono text-[11px] text-ink backdrop-blur">
+                <span className="absolute bottom-3 right-3 flex items-center gap-1.5 rounded-md bg-black/75 px-2 py-1 font-mono text-[11px] text-ink">
                   <Clock size={10} />
                   {formatDuration(member.video.durationSeconds)}
                 </span>
@@ -697,7 +690,7 @@ function MediaGroupCarousel({
       </div>
       {members.length > 1 && (
         <>
-          <span className="absolute right-3 top-3 rounded-md bg-black/60 px-2 py-1 font-mono text-[11px] text-ink backdrop-blur">
+          <span className="absolute right-3 top-3 rounded-md bg-black/75 px-2 py-1 font-mono text-[11px] text-ink">
             {active + 1}/{members.length}
           </span>
           {active > 0 && (
@@ -706,7 +699,7 @@ function MediaGroupCarousel({
                 e.stopPropagation()
                 goTo(active - 1)
               }}
-              className="absolute left-2 top-1/2 z-10 -translate-y-1/2 rounded-full bg-black/50 p-1.5 text-ink backdrop-blur transition hover:bg-black/70"
+              className="absolute left-2 top-1/2 z-10 -translate-y-1/2 rounded-full bg-black/65 p-1.5 text-ink transition hover:bg-black/80"
               aria-label="Previous"
             >
               <ChevronLeft size={16} />
@@ -718,7 +711,7 @@ function MediaGroupCarousel({
                 e.stopPropagation()
                 goTo(active + 1)
               }}
-              className="absolute right-2 top-1/2 z-10 -translate-y-1/2 rounded-full bg-black/50 p-1.5 text-ink backdrop-blur transition hover:bg-black/70"
+              className="absolute right-2 top-1/2 z-10 -translate-y-1/2 rounded-full bg-black/65 p-1.5 text-ink transition hover:bg-black/80"
               aria-label="Next"
             >
               <ChevronRight size={16} />
