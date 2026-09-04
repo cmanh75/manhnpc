@@ -13,13 +13,14 @@ interface Props {
 
 interface State {
   hasError: boolean
+  message: string | null
 }
 
 export class ErrorBoundary extends Component<Props, State> {
-  state: State = { hasError: false }
+  state: State = { hasError: false, message: null }
 
-  static getDerivedStateFromError(): State {
-    return { hasError: true }
+  static getDerivedStateFromError(error: unknown): State {
+    return { hasError: true, message: error instanceof Error ? error.message : String(error) }
   }
 
   componentDidCatch(error: unknown, info: ErrorInfo) {
@@ -39,6 +40,11 @@ export class ErrorBoundary extends Component<Props, State> {
         <div className="grid min-h-svh place-items-center bg-void px-4 text-center">
           <div>
             <p className="font-mono text-sm text-muted">something broke while loading this page</p>
+            {/* shown so a report of this screen actually carries the diagnostic info needed to
+                fix it, instead of just "it broke" with no way to tell why */}
+            {this.state.message && (
+              <p className="mx-auto mt-2 max-w-sm break-words font-mono text-[11px] text-faint">{this.state.message}</p>
+            )}
             <button
               onClick={() => window.location.reload()}
               className="mt-4 rounded-lg bg-white/8 px-4 py-2 font-mono text-xs text-ink ring-1 ring-white/15 transition hover:bg-cyan/15 hover:text-cyan"
