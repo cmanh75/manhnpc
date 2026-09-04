@@ -284,29 +284,27 @@ function BackgroundMusic({ url, suppressed = false }: { url: string; suppressed?
 }
 
 /**
- * Pinch/double-click/wheel zoom for a viewed photo, with drag-to-pan while zoomed. All gesture
- * state (scale, pan, and whether a gesture is actively in progress) lives here, not in the parent
- * viewer — a pinch fires touchmove dozens of times a second, and re-rendering the entire gallery
- * page on every one of those was the cause of the stutter on mobile.
+ * Pinch/double-click/wheel zoom for a viewed photo, plus its OWN swipe-to-navigate — all as one
+ * unified gesture handler, not layered on top of the parent figure's Framer `drag`. That hybrid
+ * approach kept losing a race: Framer's pan session can lock onto a single finger's very first
+ * micro-movement (real two-finger touches rarely land in the exact same millisecond) before our
+ * React state disabling its `drag` prop had committed, and once Framer has already started a
+ * drag it doesn't re-check the prop mid-gesture — so reactively flipping `drag` off couldn't stop
+ * it. Handling every case (pinch, pan-while-zoomed, swipe-while-not-zoomed) here means there is
+ * only one system ever deciding what a touch sequence means, with no ambiguity to race against.
  *
- * `onZoomChange` fires on `scale > 1 || gesturing`, not just `scale > 1` — a two-finger pinch's
- * fingers are already moving apart/together for a few frames before that motion has translated
- * into a scale ratio, and the parent figure's own swipe-to-navigate drag was reading those same
- * finger movements as a horizontal swipe attempt during that window (before scale had actually
- * changed). `gesturing` flips true the instant a second touch lands, well before any scale math,
- * so the parent disables its drag in time.
+ * All gesture state stays local to this small component too — a pinch fires touchmove dozens of
+ * times a second, and re-rendering the whole gallery page on every one of those was the original
+ * cause of the stutter on mobile.
  */
-function ZoomableImage({ src, alt, onZoomChange }: { src: string; alt: string; onZoomChange: (zoomed: boolean) => void }) {
+function ZoomableImage({ src, alt, onSwipe }: { src: string; alt: string; onSwipe: (direction: 1 | -1) => void }) {
   const [scale, setScale] = useState(1)
   const [pan, setPan] = useState({ x: 0, y: 0 })
   const [gesturing, setGesturing] = useState(false)
   const panStartRef = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null)
+  const swipeStartRef = useRef<{ x: number; y: number; time: number } | null>(null)
   const lastTapRef = useRef(0)
   const pinchRef = useRef<{ dist: number; scale: number } | null>(null)
-
-  useEffect(() => {
-    onZoomChange(scale > 1 || gesturing)
-  }, [scale, gesturing, onZoomChange])
 
   function toggleZoom() {
     setGesturing(false)
@@ -316,35 +314,11 @@ function ZoomableImage({ src, alt, onZoomChange }: { src: string; alt: string; o
 
   function handleWheel(e: React.WheelEvent) {
     e.preventDefault()
-    e.stopPropagation()
     setScale((s) => {
       const next = Math.min(4, Math.max(1, s - e.deltaY * 0.0015))
       if (next === 1) setPan({ x: 0, y: 0 })
       return next
     })
-  }
-
-  function handlePointerDown(e: React.PointerEvent<HTMLImageElement>) {
-    if (scale <= 1) return
-    e.stopPropagation()
-    e.currentTarget.setPointerCapture(e.pointerId)
-    setGesturing(true)
-    panStartRef.current = { x: e.clientX, y: e.clientY, panX: pan.x, panY: pan.y }
-  }
-
-  function handlePointerMove(e: React.PointerEvent<HTMLImageElement>) {
-    if (!panStartRef.current) return
-    e.stopPropagation()
-    const limit = 120 * (scale - 1)
-    setPan({
-      x: Math.min(limit, Math.max(-limit, panStartRef.current.panX + (e.clientX - panStartRef.current.x))),
-      y: Math.min(limit, Math.max(-limit, panStartRef.current.panY + (e.clientY - panStartRef.current.y))),
-    })
-  }
-
-  function handlePointerUp() {
-    panStartRef.current = null
-    setGesturing(false)
   }
 
   function touchDistance(a: React.Touch, b: React.Touch) {
@@ -353,28 +327,123 @@ function ZoomableImage({ src, alt, onZoomChange }: { src: string; alt: string; o
 
   function handleTouchStart(e: React.TouchEvent) {
     if (e.touches.length === 2) {
+      swipeStartRef.current = null
       setGesturing(true)
       pinchRef.current = { dist: touchDistance(e.touches[0], e.touches[1]), scale }
-    } else if (e.touches.length === 1) {
-      const now = Date.now()
-      if (now - lastTapRef.current < 300) toggleZoom()
-      lastTapRef.current = now
+      return
+    }
+    if (e.touches.length !== 1) return
+    const now = Date.now()
+    if (now - lastTapRef.current < 300) {
+      toggleZoom()
+      lastTapRef.current = 0
+      return
+    }
+    lastTapRef.current = now
+    const t = e.touches[0]
+    if (scale > 1) {
+      setGesturing(true)
+      panStartRef.current = { x: t.clientX, y: t.clientY, panX: pan.x, panY: pan.y }
+    } else {
+      swipeStartRef.current = { x: t.clientX, y: t.clientY, time: now }
     }
   }
 
   function handleTouchMove(e: React.TouchEvent) {
-    if (e.touches.length !== 2 || !pinchRef.current) return
-    e.preventDefault()
-    const dist = touchDistance(e.touches[0], e.touches[1])
-    const next = Math.min(4, Math.max(1, pinchRef.current.scale * (dist / pinchRef.current.dist)))
-    setScale(next)
-    if (next === 1) setPan({ x: 0, y: 0 })
+    if (e.touches.length === 2 && pinchRef.current) {
+      e.preventDefault()
+      const dist = touchDistance(e.touches[0], e.touches[1])
+      const next = Math.min(4, Math.max(1, pinchRef.current.scale * (dist / pinchRef.current.dist)))
+      setScale(next)
+      if (next === 1) setPan({ x: 0, y: 0 })
+      return
+    }
+    if (e.touches.length !== 1) return
+    const t = e.touches[0]
+    if (panStartRef.current) {
+      e.preventDefault()
+      const limit = 120 * (scale - 1)
+      setPan({
+        x: Math.min(limit, Math.max(-limit, panStartRef.current.panX + (t.clientX - panStartRef.current.x))),
+        y: Math.min(limit, Math.max(-limit, panStartRef.current.panY + (t.clientY - panStartRef.current.y))),
+      })
+    } else if (swipeStartRef.current) {
+      // live feedback for a not-yet-committed swipe — same translate the CSS transform already
+      // uses for pan, since scale is 1 here it's a flat, unscaled offset either way
+      setGesturing(true)
+      setPan({ x: t.clientX - swipeStartRef.current.x, y: 0 })
+    }
   }
 
   function handleTouchEnd(e: React.TouchEvent) {
-    if (e.touches.length < 2) {
-      pinchRef.current = null
+    if (e.touches.length < 2) pinchRef.current = null
+    if (e.touches.length > 0) return
+    if (panStartRef.current) {
+      panStartRef.current = null
       setGesturing(false)
+    }
+    const start = swipeStartRef.current
+    swipeStartRef.current = null
+    if (start) {
+      const t = e.changedTouches[0]
+      const dx = t.clientX - start.x
+      const dy = t.clientY - start.y
+      const dt = Date.now() - start.time
+      setGesturing(false)
+      if (Math.abs(dy) < 80 && (Math.abs(dx) > 60 || Math.abs(dx) / Math.max(dt, 1) > 0.5)) {
+        onSwipe(dx < 0 ? 1 : -1)
+      } else {
+        setPan({ x: 0, y: 0 })
+      }
+    }
+  }
+
+  // Mouse/pen only — touch is handled entirely above via TouchEvents. Handling the same touch
+  // interaction twice (once via synthetic PointerEvents, once via TouchEvents) would double up
+  // pan/swipe state changes, so pointer handlers explicitly opt out of pointerType 'touch'.
+  function handlePointerDown(e: React.PointerEvent<HTMLImageElement>) {
+    if (e.pointerType === 'touch') return
+    e.currentTarget.setPointerCapture(e.pointerId)
+    if (scale > 1) {
+      setGesturing(true)
+      panStartRef.current = { x: e.clientX, y: e.clientY, panX: pan.x, panY: pan.y }
+    } else {
+      swipeStartRef.current = { x: e.clientX, y: e.clientY, time: Date.now() }
+    }
+  }
+
+  function handlePointerMove(e: React.PointerEvent<HTMLImageElement>) {
+    if (e.pointerType === 'touch') return
+    if (panStartRef.current) {
+      const limit = 120 * (scale - 1)
+      setPan({
+        x: Math.min(limit, Math.max(-limit, panStartRef.current.panX + (e.clientX - panStartRef.current.x))),
+        y: Math.min(limit, Math.max(-limit, panStartRef.current.panY + (e.clientY - panStartRef.current.y))),
+      })
+    } else if (swipeStartRef.current) {
+      setGesturing(true)
+      setPan({ x: e.clientX - swipeStartRef.current.x, y: 0 })
+    }
+  }
+
+  function handlePointerUp(e: React.PointerEvent<HTMLImageElement>) {
+    if (e.pointerType === 'touch') return
+    if (panStartRef.current) {
+      panStartRef.current = null
+      setGesturing(false)
+    }
+    const start = swipeStartRef.current
+    swipeStartRef.current = null
+    if (start) {
+      const dx = e.clientX - start.x
+      const dy = e.clientY - start.y
+      const dt = Date.now() - start.time
+      setGesturing(false)
+      if (Math.abs(dy) < 80 && (Math.abs(dx) > 60 || Math.abs(dx) / Math.max(dt, 1) > 0.5)) {
+        onSwipe(dx < 0 ? 1 : -1)
+      } else {
+        setPan({ x: 0, y: 0 })
+      }
     }
   }
 
@@ -392,6 +461,7 @@ function ZoomableImage({ src, alt, onZoomChange }: { src: string; alt: string; o
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
+      onTouchCancel={handleTouchEnd}
       style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`, willChange: 'transform' }}
       className={clsx(
         'mx-auto block max-h-[74svh] max-w-full touch-none select-none rounded-xl object-contain shadow-2xl',
@@ -792,12 +862,6 @@ export function GalleryPage() {
       alert('could not remove item')
     }
   }
-
-  // Whether the currently-viewed photo is pinch/double-click zoomed — owned by ZoomableImage
-  // itself (touch/pointer-move-driven state stays local to that small component so a pinch
-  // gesture doesn't re-render this whole page every frame); this only flips on zoom-in/zoom-out,
-  // so it's cheap to lift just far enough to disable the figure's own swipe-to-navigate drag.
-  const [photoZoomed, setPhotoZoomed] = useState(false)
 
   // TikTok-style background track: photos have no audio of their own, so a post's attached
   // music (if any) loops behind the viewer while a photo from that post is on screen. Videos
@@ -1223,9 +1287,9 @@ export function GalleryPage() {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.3 }}
-              className={clsx('max-h-[86svh] max-w-full', !photoZoomed && 'cursor-grab active:cursor-grabbing')}
+              className={clsx('max-h-[86svh] max-w-full', current.kind === 'video' && 'cursor-grab active:cursor-grabbing')}
               onClick={(e) => e.stopPropagation()}
-              drag={current.kind === 'photo' && photoZoomed ? false : 'x'}
+              drag={current.kind === 'video' ? 'x' : false}
               dragConstraints={{ left: 0, right: 0 }}
               dragElastic={0.6}
               onDragEnd={(_, info) => {
@@ -1238,7 +1302,15 @@ export function GalleryPage() {
               }}
             >
               {current.kind === 'photo' ? (
-                <ZoomableImage src={current.photo.url} alt={current.photo.title} onZoomChange={setPhotoZoomed} />
+                <ZoomableImage
+                  src={current.photo.url}
+                  alt={current.photo.title}
+                  onSwipe={(direction) =>
+                    setLightbox((i) =>
+                      i === null ? null : direction === 1 ? Math.min(i + 1, viewerItems.length - 1) : Math.max(i - 1, 0),
+                    )
+                  }
+                />
               ) : (
                 <video
                   src={current.video.url}
